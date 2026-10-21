@@ -1,3 +1,6 @@
+using Logistics_Assistant.Configuration;
+
+
 namespace Logistics_Assistant
 {
     public class Program
@@ -6,6 +9,12 @@ namespace Logistics_Assistant
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            DatabaseConfiguration.ConfigureDatabase(
+                builder.Services,
+                builder.Configuration);
+
+            IdentityConfiguration.ConfigureIdentity(
+                builder.Services);
             // Add services to the container.
             builder.Services.AddRazorPages();
 
@@ -15,7 +24,6 @@ namespace Logistics_Assistant
             if (!app.Environment.IsDevelopment())
             {
                 app.UseExceptionHandler("/Error");
-                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
 
