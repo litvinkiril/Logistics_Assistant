@@ -3,6 +3,7 @@ using Logistics_Assistant.Pages.Products;
 using Logistics_Assistant.Services.Products;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Logistics_Assistant.Services.Warehouses;
 using Xunit;
 
 namespace Logistics_Assistant.Tests;
@@ -85,5 +86,19 @@ public class SearchModelValidationTests
             .Options;
 
         return new ApplicationDbContext(options);
+    }
+    [Fact]
+    public async Task WarehouseStock_TextId_ReturnsBadRequest()
+    {
+        using var db = CreateDbContext();
+
+        var page = new SearchModel(new ProductSearchService(db));
+        var stockService = new WarehouseStockService(db);
+
+        var result = await page.OnGetWarehouseStockByProductIdAsync(
+            "abc",
+            stockService);
+
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 }

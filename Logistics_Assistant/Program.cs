@@ -1,5 +1,7 @@
 using Logistics_Assistant.Configuration;
 using Logistics_Assistant.Services.Products;
+using Logistics_Assistant.Services.Warehouses;
+
 
 
 namespace Logistics_Assistant
@@ -17,6 +19,7 @@ namespace Logistics_Assistant
             IdentityConfiguration.ConfigureIdentity(
                 builder.Services);
             builder.Services.AddScoped<ProductSearchService>();
+            builder.Services.AddScoped<WarehouseStockService>();
             // Add services to the container.
             builder.Services.AddRazorPages();
 

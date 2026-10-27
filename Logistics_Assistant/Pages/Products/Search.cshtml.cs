@@ -1,4 +1,5 @@
 using Logistics_Assistant.Services.Products;
+using Logistics_Assistant.Services.Warehouses;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -71,5 +72,28 @@ namespace Logistics_Assistant.Pages.Products
 
             return new JsonResult(products);
         }
+        public async Task<IActionResult> OnGetWarehouseStockByProductIdAsync(
+            string? idStr,
+            [FromServices] WarehouseStockService stockService)
+        {
+            if (!long.TryParse(idStr, out long productId) || productId <= 0)
+            {
+                return BadRequest(
+                    "ID должен быть положительным целым числом.");
+            }
+
+            var result = await stockService.SearchProductStockByIdAsync(
+                productId,
+                HttpContext.RequestAborted);
+
+            if (result is null)
+            {
+                return NotFound("Товар не найден.");
+            }
+
+            return new JsonResult(result);
+        }
     }
+
+
 }
