@@ -22,6 +22,50 @@ namespace Logistics_Assistant.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Logistics_Assistant.Models.Box", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("BoxNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("box_number");
+
+                    b.Property<decimal>("HeightCm")
+                        .HasColumnType("numeric(8,2)")
+                        .HasColumnName("height_cm");
+
+                    b.Property<bool>("IsFragile")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_fragile");
+
+                    b.Property<decimal>("LengthCm")
+                        .HasColumnType("numeric(8,2)")
+                        .HasColumnName("length_cm");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("product_id");
+
+                    b.Property<decimal>("WeightKg")
+                        .HasColumnType("numeric(8,3)")
+                        .HasColumnName("weight_kg");
+
+                    b.Property<decimal>("WidthCm")
+                        .HasColumnType("numeric(8,2)")
+                        .HasColumnName("width_cm");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("boxes");
+                });
+
             modelBuilder.Entity("Logistics_Assistant.Models.LogisticsPoint", b =>
                 {
                     b.Property<long>("Id")
@@ -69,6 +113,33 @@ namespace Logistics_Assistant.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("logistics_points");
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.PhysicalBox", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BoxId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("box_id");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("url");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BoxId");
+
+                    b.HasIndex(new[] { "Url" }, "idx_physical_boxes_url");
+
+                    b.ToTable("physical_boxes");
                 });
 
             modelBuilder.Entity("Logistics_Assistant.Models.Product", b =>
@@ -325,6 +396,28 @@ namespace Logistics_Assistant.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.Box", b =>
+                {
+                    b.HasOne("Logistics_Assistant.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.PhysicalBox", b =>
+                {
+                    b.HasOne("Logistics_Assistant.Models.Box", "Box")
+                        .WithMany()
+                        .HasForeignKey("BoxId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Box");
                 });
 
             modelBuilder.Entity("Logistics_Assistant.Models.WarehouseProduct", b =>

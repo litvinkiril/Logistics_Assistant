@@ -10,6 +10,8 @@ namespace Logistics_Assistant.Data
         public DbSet<Product> Products { get; set; }
         public DbSet<LogisticsPoint> LogisticsPoints { get; set; }
         public DbSet<WarehouseProduct> WarehouseProducts { get; set; }
+        public DbSet<Box> Boxes { get; set; }
+        public DbSet<PhysicalBox> PhysicalBoxes { get; set; }
 
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options)
@@ -32,6 +34,18 @@ namespace Logistics_Assistant.Data
                 .HasOne(stock => stock.Product)
                 .WithMany()
                 .HasForeignKey(stock => stock.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Box>()
+                .HasOne(box => box.Product)
+                .WithMany()
+                .HasForeignKey(box => box.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PhysicalBox>()
+                .HasOne(physicalBox => physicalBox.Box)
+                .WithMany()
+                .HasForeignKey(physicalBox => physicalBox.BoxId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }
