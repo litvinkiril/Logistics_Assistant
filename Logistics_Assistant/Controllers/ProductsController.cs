@@ -76,7 +76,7 @@ public class ProductsController : ControllerBase
         if (productId <= 0 || pointId <= 0)
             return BadRequest("ID товара и точки должны быть положительными числами.");
 
-        var result = await _points.SearchProductStockAtPointAsync(
+        var result = await _search.SearchProductStockAtPointAsync(
             productId,
             pointId,
             cancellationToken);
