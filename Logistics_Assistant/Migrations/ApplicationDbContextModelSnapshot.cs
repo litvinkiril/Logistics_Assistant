@@ -115,6 +115,41 @@ namespace Logistics_Assistant.Migrations
                     b.ToTable("logistics_points");
                 });
 
+            modelBuilder.Entity("Logistics_Assistant.Models.NeedToDeliver", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("BoxId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("box_id");
+
+                    b.Property<long?>("LogisticPointId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("logistic_point_id");
+
+                    b.Property<long?>("ProductId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("product_id");
+
+                    b.Property<int?>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "LogisticPointId" }, "idx_need_to_deliver_logistic_point_id");
+
+                    b.ToTable("need_to_deliver", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_need_to_deliver_product_or_box", "(product_id IS NOT NULL AND box_id IS NULL)\r\nOR\r\n(product_id IS NULL AND box_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Logistics_Assistant.Models.PhysicalBox", b =>
                 {
                     b.Property<long>("Id")

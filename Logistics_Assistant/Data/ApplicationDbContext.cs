@@ -12,6 +12,7 @@ namespace Logistics_Assistant.Data
         public DbSet<WarehouseProduct> WarehouseProducts { get; set; }
         public DbSet<Box> Boxes { get; set; }
         public DbSet<PhysicalBox> PhysicalBoxes { get; set; }
+        public DbSet<NeedToDeliver> NeedToDeliverItems { get; set; }
 
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options)
@@ -47,6 +48,19 @@ namespace Logistics_Assistant.Data
                 .WithMany()
                 .HasForeignKey(physicalBox => physicalBox.BoxId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<NeedToDeliver>()
+                .ToTable("need_to_deliver", table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_need_to_deliver_product_or_box",
+                        """
+                        (product_id IS NOT NULL AND box_id IS NULL)
+                        OR
+                        (product_id IS NULL AND box_id IS NOT NULL)
+                        """
+                    );
+                });
         }
     }
 }

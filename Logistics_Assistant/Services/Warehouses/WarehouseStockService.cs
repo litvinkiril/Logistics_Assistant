@@ -1,5 +1,6 @@
 ﻿using Logistics_Assistant.Data;
 using Logistics_Assistant.DTOs.Products;
+using Logistics_Assistant.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logistics_Assistant.Services.Warehouses
@@ -36,6 +37,45 @@ namespace Logistics_Assistant.Services.Warehouses
                         .ToList()
                 })
                 .SingleOrDefaultAsync(cancellationToken);
+        }
+
+        public Task<List<LogisticsPoint>> GetWarehousesAsync(
+            CancellationToken cancellationToken)
+        {
+            return _db.LogisticsPoints
+                .AsNoTracking()
+                .Where(point => point.Type == "warehouse")
+                .OrderBy(point => point.Name)
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<LogisticsPoint?> GetWarehouseByIdAsync(
+            long id,
+            CancellationToken cancellationToken)
+        {
+            return _db.LogisticsPoints
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    point => point.Id == id && point.Type == "warehouse",
+                    cancellationToken);
+        }
+
+        public Task<List<LogisticsPoint>> SearchWarehousesByNameAsync(
+            string name,
+            CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+            var searchName = name.Trim();
+
+            return _db.LogisticsPoints
+                .AsNoTracking()
+                .Where(point =>
+                    point.Type == "warehouse" &&
+                    EF.Functions.ILike(point.Name, $"%{searchName}%"))
+                .OrderBy(point => point.Name)
+                .ThenBy(point => point.Id)
+                .ToListAsync(cancellationToken);
         }
     }
 }

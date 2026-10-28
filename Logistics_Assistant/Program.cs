@@ -22,6 +22,7 @@ namespace Logistics_Assistant
             builder.Services.AddScoped<WarehouseStockService>();
             // Add services to the container.
             builder.Services.AddRazorPages();
+            builder.Services.AddControllers();
 
             var app = builder.Build();
 
@@ -41,6 +42,7 @@ namespace Logistics_Assistant
             app.MapStaticAssets();
             app.MapRazorPages()
                .WithStaticAssets();
+            app.MapControllers();
 
             app.Run();
         }
