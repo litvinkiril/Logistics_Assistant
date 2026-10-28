@@ -13,7 +13,8 @@ namespace Logistics_Assistant.Data
         public DbSet<Box> Boxes { get; set; }
         public DbSet<PhysicalBox> PhysicalBoxes { get; set; }
         public DbSet<NeedToDeliver> NeedToDeliverItems { get; set; }
-
+        public DbSet<DeliveryOrder> DeliveryOrders { get; set; }
+        public DbSet<DeliveryOrderBox> DeliveryOrderBoxes { get; set; }
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options)
             : base(options)
@@ -61,6 +62,21 @@ namespace Logistics_Assistant.Data
                         """
                     );
                 });
+            modelBuilder.Entity<DeliveryOrderBox>(entity =>
+            {
+                entity.HasKey(x => new { x.OrderId, x.PhysicalBoxId });
+
+                entity.Property(x => x.Status)
+                    .HasDefaultValue(DeliveryBoxStatus.Loading);
+
+                entity.ToTable("delivery_order_boxes", table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_delivery_order_boxes_status",
+                        "status IN (1, 2, 3, 4)"
+                    );
+                });
+            });
         }
     }
 }

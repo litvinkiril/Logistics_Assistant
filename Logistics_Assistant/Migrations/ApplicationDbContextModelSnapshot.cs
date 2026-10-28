@@ -66,6 +66,93 @@ namespace Logistics_Assistant.Migrations
                     b.ToTable("boxes");
                 });
 
+            modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrder", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CarPlate")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("car_plate");
+
+                    b.Property<decimal>("CargoHeightCm")
+                        .HasColumnType("numeric(8,2)")
+                        .HasColumnName("cargo_height_cm");
+
+                    b.Property<decimal>("CargoLengthCm")
+                        .HasColumnType("numeric(8,2)")
+                        .HasColumnName("cargo_length_cm");
+
+                    b.Property<decimal>("CargoWidthCm")
+                        .HasColumnType("numeric(8,2)")
+                        .HasColumnName("cargo_width_cm");
+
+                    b.Property<string>("ContactPhone")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("contact_phone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("MaxLoadKg")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("max_load_kg");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("delivery_orders");
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrderBox", b =>
+                {
+                    b.Property<long>("OrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("PhysicalBoxId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("physical_box_id");
+
+                    b.Property<long>("PointId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("point_id");
+
+                    b.Property<long>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("status");
+
+                    b.HasKey("OrderId", "PhysicalBoxId");
+
+                    b.HasIndex(new[] { "PointId" }, "idx_delivery_order_boxes_point_id");
+
+                    b.ToTable("delivery_order_boxes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_delivery_order_boxes_status", "status IN (1, 2, 3, 4)");
+                        });
+                });
+
             modelBuilder.Entity("Logistics_Assistant.Models.LogisticsPoint", b =>
                 {
                     b.Property<long>("Id")
