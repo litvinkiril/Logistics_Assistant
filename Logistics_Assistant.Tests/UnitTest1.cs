@@ -3,7 +3,7 @@ using Logistics_Assistant.Pages.Products;
 using Logistics_Assistant.Services.Products;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Logistics_Assistant.Services.Warehouses;
+using Logistics_Assistant.Services.LogisticsPoints;
 using Xunit;
 
 namespace Logistics_Assistant.Tests;
@@ -93,7 +93,7 @@ public class SearchModelValidationTests
         using var db = CreateDbContext();
 
         var page = new SearchModel(new ProductSearchService(db));
-        var stockService = new WarehouseStockService(db);
+        var stockService = new LogisticsPointService(db);
 
         var result = await page.OnGetWarehouseStockByProductIdAsync(
             "abc",

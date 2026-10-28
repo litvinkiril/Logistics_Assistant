@@ -1,5 +1,6 @@
 ﻿using Logistics_Assistant.Data;
 using Logistics_Assistant.Models;
+using Logistics_Assistant.DTOs.Products;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logistics_Assistant.Services.LogisticsPoints
@@ -11,6 +12,31 @@ namespace Logistics_Assistant.Services.LogisticsPoints
         public LogisticsPointService(ApplicationDbContext db)
         {
             _db = db;
+        }
+
+        // Retains the existing product-stock page after replacing WarehouseStockService.
+        public Task<ProductStockResponse?> SearchProductStockByIdAsync(
+            long productId,
+            CancellationToken cancellationToken)
+        {
+            return _db.Products
+                .AsNoTracking()
+                .Where(product => product.Id == productId)
+                .Select(product => new ProductStockResponse
+                {
+                    Product = product,
+                    Warehouses = _db.WarehouseProducts
+                        .Where(stock => stock.ProductId == product.Id)
+                        .OrderBy(stock => stock.LogisticsPointId)
+                        .ThenBy(stock => stock.Id)
+                        .Select(stock => new WarehouseStockDto
+                        {
+                            Warehouse = stock.LogisticsPoint,
+                            Quantity = stock.Quantity
+                        })
+                        .ToList()
+                })
+                .SingleOrDefaultAsync(cancellationToken);
         }
 
         public Task<List<LogisticsPoint>> GetPointsAsync(

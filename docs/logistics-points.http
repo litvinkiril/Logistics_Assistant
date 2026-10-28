@@ -1,0 +1,36 @@
+@baseUrl = https://localhost:7222
+@pointId = 1
+
+### Все склады и ПВЗ (200, JSON-массив)
+GET {{baseUrl}}/api/logistics-points
+Accept: application/json
+
+### Только склады
+GET {{baseUrl}}/api/logistics-points?type=warehouse
+
+### Только ПВЗ (если ваша БД использует другой type, замените pvz)
+GET {{baseUrl}}/api/logistics-points?type=pvz
+
+### Информация о точке (200 или 404, если такого ID нет)
+GET {{baseUrl}}/api/logistics-points/{{pointId}}
+
+### Поиск по названию, городу или адресу
+GET {{baseUrl}}/api/logistics-points/search?query=Москва
+
+### Поиск ПВЗ в Москве
+GET {{baseUrl}}/api/logistics-points/search?query=Москва&type=pvz
+
+### Литеральный поиск знака процента, не всех строк
+GET {{baseUrl}}/api/logistics-points/search?query=%25
+
+### Пустой поиск возвращает все точки
+GET {{baseUrl}}/api/logistics-points/search
+
+### Некорректный ID: ожидается 400
+GET {{baseUrl}}/api/logistics-points/0
+
+### Нечисловой ID: ожидается 404 (маршрут с ограничением long)
+GET {{baseUrl}}/api/logistics-points/not-a-number
+
+### Несуществующий ID: ожидается 404, если такой записи нет
+GET {{baseUrl}}/api/logistics-points/9223372036854775807

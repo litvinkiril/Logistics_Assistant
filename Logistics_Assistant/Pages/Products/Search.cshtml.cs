@@ -1,5 +1,5 @@
 using Logistics_Assistant.Services.Products;
-using Logistics_Assistant.Services.Warehouses;
+using Logistics_Assistant.Services.LogisticsPoints;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -75,7 +75,7 @@ namespace Logistics_Assistant.Pages.Products
 
         public async Task<IActionResult> OnGetWarehouseStockByProductIdAsync(
             string? idStr,
-            [FromServices] WarehouseStockService stockService)
+            [FromServices] LogisticsPointService stockService)
         {
             if (!long.TryParse(idStr, out long productId) || productId <= 0)
             {
