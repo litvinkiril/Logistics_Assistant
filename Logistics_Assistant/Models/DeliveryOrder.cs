@@ -14,27 +14,28 @@ namespace Logistics_Assistant.Models
         [Column("user_id")]
         public string UserId { get; set; } = string.Empty;
 
-        [Required]
         [Column("car_plate")]
         [MaxLength(20)]
-        public string CarPlate { get; set; } = string.Empty;
+        public string? CarPlate { get; set; }
 
-        [Required]
         [Column("contact_phone")]
         [MaxLength(32)]
-        public string ContactPhone { get; set; } = string.Empty;
+        public string? ContactPhone { get; set; }
 
         [Column("cargo_length_cm", TypeName = "numeric(8,2)")]
-        public decimal CargoLengthCm { get; set; }
+        public decimal? CargoLengthCm { get; set; }
 
         [Column("cargo_width_cm", TypeName = "numeric(8,2)")]
-        public decimal CargoWidthCm { get; set; }
+        public decimal? CargoWidthCm { get; set; }
 
         [Column("cargo_height_cm", TypeName = "numeric(8,2)")]
-        public decimal CargoHeightCm { get; set; }
+        public decimal? CargoHeightCm { get; set; }
 
         [Column("max_load_kg", TypeName = "numeric(10,2)")]
-        public decimal MaxLoadKg { get; set; }
+        public decimal? MaxLoadKg { get; set; }
+
+        [Column("source_point_id")]
+        public long? SourcePointId { get; set; }
 
         [Required]
         [Column("status")]

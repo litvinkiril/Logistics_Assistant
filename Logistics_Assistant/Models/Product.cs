@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Logistics_Assistant.Models
 {
     [Table("products")]
-    [Index(nameof(Url), Name = "idx_products_url")]
+    [Index(nameof(Url), IsUnique = true, Name = "idx_products_url")]
     public class Product
     {
         [Column("id")]

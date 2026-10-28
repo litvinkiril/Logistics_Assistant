@@ -72,6 +72,7 @@ namespace Logistics_Assistant.Pages.Products
 
             return new JsonResult(products);
         }
+
         public async Task<IActionResult> OnGetWarehouseStockByProductIdAsync(
             string? idStr,
             [FromServices] WarehouseStockService stockService)

@@ -61,9 +61,67 @@ namespace Logistics_Assistant.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("ProductId", "BoxNumber")
+                        .IsUnique();
 
-                    b.ToTable("boxes");
+                    b.ToTable("boxes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_boxes_dimensions", "width_cm > 0 AND height_cm > 0 AND length_cm > 0 AND weight_kg > 0");
+
+                            t.HasCheckConstraint("ck_boxes_number", "box_number > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.BoxMovement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("FromPointId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_point_id");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<long>("OrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("PhysicalBoxId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("physical_box_id");
+
+                    b.Property<long?>("ToPointId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_point_id");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromPointId");
+
+                    b.HasIndex("ToPointId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("OrderId", "PhysicalBoxId");
+
+                    b.HasIndex("PhysicalBoxId", "OccurredAt");
+
+                    b.ToTable("box_movements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_box_movements_direction", "(from_point_id IS NOT NULL AND to_point_id IS NULL) OR (from_point_id IS NULL AND to_point_id IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrder", b =>
@@ -76,25 +134,23 @@ namespace Logistics_Assistant.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("CarPlate")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("car_plate");
 
-                    b.Property<decimal>("CargoHeightCm")
+                    b.Property<decimal?>("CargoHeightCm")
                         .HasColumnType("numeric(8,2)")
                         .HasColumnName("cargo_height_cm");
 
-                    b.Property<decimal>("CargoLengthCm")
+                    b.Property<decimal?>("CargoLengthCm")
                         .HasColumnType("numeric(8,2)")
                         .HasColumnName("cargo_length_cm");
 
-                    b.Property<decimal>("CargoWidthCm")
+                    b.Property<decimal?>("CargoWidthCm")
                         .HasColumnType("numeric(8,2)")
                         .HasColumnName("cargo_width_cm");
 
                     b.Property<string>("ContactPhone")
-                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("contact_phone");
@@ -103,9 +159,13 @@ namespace Logistics_Assistant.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<decimal>("MaxLoadKg")
+                    b.Property<decimal?>("MaxLoadKg")
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("max_load_kg");
+
+                    b.Property<long?>("SourcePointId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_point_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -120,6 +180,10 @@ namespace Logistics_Assistant.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SourcePointId");
+
+                    b.HasIndex("UserId");
+
                     b.ToTable("delivery_orders");
                 });
 
@@ -133,6 +197,18 @@ namespace Logistics_Assistant.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("physical_box_id");
 
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<DateTime?>("LoadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("loaded_at");
+
+                    b.Property<long?>("OrderNeedId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_need_id");
+
                     b.Property<long>("PointId")
                         .HasColumnType("bigint")
                         .HasColumnName("point_id");
@@ -143,13 +219,113 @@ namespace Logistics_Assistant.Migrations
                         .HasDefaultValue(1L)
                         .HasColumnName("status");
 
+                    b.Property<DateTime?>("UnloadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unloaded_at");
+
                     b.HasKey("OrderId", "PhysicalBoxId");
+
+                    b.HasIndex("PhysicalBoxId")
+                        .IsUnique()
+                        .HasFilter("status <> 4 AND cancelled_at IS NULL");
+
+                    b.HasIndex("OrderNeedId", "OrderId");
 
                     b.HasIndex(new[] { "PointId" }, "idx_delivery_order_boxes_point_id");
 
                     b.ToTable("delivery_order_boxes", null, t =>
                         {
+                            t.HasCheckConstraint("ck_delivery_order_boxes_scan_times", "unloaded_at IS NULL OR (loaded_at IS NOT NULL AND unloaded_at >= loaded_at)");
+
                             t.HasCheckConstraint("ck_delivery_order_boxes_status", "status IN (1, 2, 3, 4)");
+                        });
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrderNeed", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<int>("DeliveredQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("delivered_quantity");
+
+                    b.Property<long>("NeedToDeliverId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("need_to_deliver_id");
+
+                    b.Property<long>("OrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NeedToDeliverId");
+
+                    b.HasIndex("OrderId", "NeedToDeliverId")
+                        .IsUnique();
+
+                    b.ToTable("delivery_order_needs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_delivery_order_needs_quantity", "quantity > 0 AND delivered_quantity >= 0 AND delivered_quantity <= quantity");
+                        });
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrderUnit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at");
+
+                    b.Property<long>("OrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("OrderNeedId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_need_id");
+
+                    b.Property<long>("ProductUnitId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("product_unit_id");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductUnitId")
+                        .IsUnique()
+                        .HasFilter("released_at IS NULL");
+
+                    b.HasIndex("OrderId", "ProductUnitId")
+                        .IsUnique();
+
+                    b.HasIndex("OrderNeedId", "OrderId");
+
+                    b.ToTable("delivery_order_units", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_delivery_order_units_release", "delivered_at IS NULL OR (released_at IS NOT NULL AND released_at >= delivered_at)");
                         });
                 });
 
@@ -229,11 +405,17 @@ namespace Logistics_Assistant.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BoxId");
+
+                    b.HasIndex("ProductId");
+
                     b.HasIndex(new[] { "LogisticPointId" }, "idx_need_to_deliver_logistic_point_id");
 
                     b.ToTable("need_to_deliver", null, t =>
                         {
                             t.HasCheckConstraint("ck_need_to_deliver_product_or_box", "(product_id IS NOT NULL AND box_id IS NULL)\r\nOR\r\n(product_id IS NULL AND box_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_need_to_deliver_quantity", "quantity IS NULL OR quantity > 0");
                         });
                 });
 
@@ -250,6 +432,22 @@ namespace Logistics_Assistant.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("box_id");
 
+                    b.Property<long?>("CurrentOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("current_order_id");
+
+                    b.Property<long?>("CurrentPointId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("current_point_id");
+
+                    b.Property<long?>("ProductId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("product_id");
+
+                    b.Property<long?>("ProductUnitId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("product_unit_id");
+
                     b.Property<string>("Url")
                         .IsRequired()
                         .HasColumnType("text")
@@ -257,11 +455,29 @@ namespace Logistics_Assistant.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BoxId");
+                    b.HasIndex("CurrentOrderId");
 
-                    b.HasIndex(new[] { "Url" }, "idx_physical_boxes_url");
+                    b.HasIndex("CurrentPointId");
 
-                    b.ToTable("physical_boxes");
+                    b.HasIndex("BoxId", "ProductId");
+
+                    b.HasIndex("ProductUnitId", "BoxId")
+                        .IsUnique()
+                        .HasFilter("product_unit_id IS NOT NULL");
+
+                    b.HasIndex("ProductUnitId", "ProductId");
+
+                    b.HasIndex(new[] { "Url" }, "idx_physical_boxes_url")
+                        .IsUnique();
+
+                    b.ToTable("physical_boxes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_physical_boxes_location", "current_point_id IS NULL OR current_order_id IS NULL");
+
+                            t.HasCheckConstraint("ck_physical_boxes_unit_product", "product_unit_id IS NULL OR product_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_physical_boxes_url", "length(btrim(url)) > 0");
+                        });
                 });
 
             modelBuilder.Entity("Logistics_Assistant.Models.Product", b =>
@@ -285,9 +501,41 @@ namespace Logistics_Assistant.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex(new[] { "Url" }, "idx_products_url");
+                    b.HasIndex(new[] { "Url" }, "idx_products_url")
+                        .IsUnique();
 
                     b.ToTable("products");
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.ProductUnit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("ExpectedBoxCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_box_count");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("product_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("product_units", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_units_expected_boxes", "expected_box_count > 0");
+                        });
                 });
 
             modelBuilder.Entity("Logistics_Assistant.Models.WarehouseProduct", b =>
@@ -313,11 +561,15 @@ namespace Logistics_Assistant.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LogisticsPointId");
-
                     b.HasIndex("ProductId");
 
-                    b.ToTable("warehouse_products");
+                    b.HasIndex("LogisticsPointId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("warehouse_products", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_warehouse_products_quantity", "quantity >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -531,6 +783,121 @@ namespace Logistics_Assistant.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("Logistics_Assistant.Models.BoxMovement", b =>
+                {
+                    b.HasOne("Logistics_Assistant.Models.LogisticsPoint", null)
+                        .WithMany()
+                        .HasForeignKey("FromPointId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Logistics_Assistant.Models.LogisticsPoint", null)
+                        .WithMany()
+                        .HasForeignKey("ToPointId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Logistics_Assistant.Models.DeliveryOrderBox", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId", "PhysicalBoxId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrder", b =>
+                {
+                    b.HasOne("Logistics_Assistant.Models.LogisticsPoint", null)
+                        .WithMany()
+                        .HasForeignKey("SourcePointId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrderBox", b =>
+                {
+                    b.HasOne("Logistics_Assistant.Models.DeliveryOrder", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Logistics_Assistant.Models.PhysicalBox", null)
+                        .WithMany()
+                        .HasForeignKey("PhysicalBoxId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Logistics_Assistant.Models.LogisticsPoint", null)
+                        .WithMany()
+                        .HasForeignKey("PointId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Logistics_Assistant.Models.DeliveryOrderNeed", null)
+                        .WithMany()
+                        .HasForeignKey("OrderNeedId", "OrderId")
+                        .HasPrincipalKey("Id", "OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrderNeed", b =>
+                {
+                    b.HasOne("Logistics_Assistant.Models.NeedToDeliver", null)
+                        .WithMany()
+                        .HasForeignKey("NeedToDeliverId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Logistics_Assistant.Models.DeliveryOrder", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrderUnit", b =>
+                {
+                    b.HasOne("Logistics_Assistant.Models.ProductUnit", null)
+                        .WithMany()
+                        .HasForeignKey("ProductUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Logistics_Assistant.Models.DeliveryOrderNeed", null)
+                        .WithMany()
+                        .HasForeignKey("OrderNeedId", "OrderId")
+                        .HasPrincipalKey("Id", "OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.NeedToDeliver", b =>
+                {
+                    b.HasOne("Logistics_Assistant.Models.Box", null)
+                        .WithMany()
+                        .HasForeignKey("BoxId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Logistics_Assistant.Models.LogisticsPoint", null)
+                        .WithMany()
+                        .HasForeignKey("LogisticPointId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Logistics_Assistant.Models.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Logistics_Assistant.Models.PhysicalBox", b =>
                 {
                     b.HasOne("Logistics_Assistant.Models.Box", "Box")
@@ -539,7 +906,38 @@ namespace Logistics_Assistant.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Logistics_Assistant.Models.DeliveryOrder", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Logistics_Assistant.Models.LogisticsPoint", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentPointId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Logistics_Assistant.Models.Box", null)
+                        .WithMany()
+                        .HasForeignKey("BoxId", "ProductId")
+                        .HasPrincipalKey("Id", "ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Logistics_Assistant.Models.ProductUnit", null)
+                        .WithMany()
+                        .HasForeignKey("ProductUnitId", "ProductId")
+                        .HasPrincipalKey("Id", "ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Box");
+                });
+
+            modelBuilder.Entity("Logistics_Assistant.Models.ProductUnit", b =>
+                {
+                    b.HasOne("Logistics_Assistant.Models.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Logistics_Assistant.Models.WarehouseProduct", b =>

@@ -33,6 +33,18 @@ namespace Logistics_Assistant.Models
         [Column("point_id")]
         public long PointId { get; set; }
 
+        [Column("order_need_id")]
+        public long? OrderNeedId { get; set; }
+
+        [Column("loaded_at")]
+        public DateTime? LoadedAt { get; set; }
+
+        [Column("unloaded_at")]
+        public DateTime? UnloadedAt { get; set; }
+
+        [Column("cancelled_at")]
+        public DateTime? CancelledAt { get; set; }
+
         [Column("status", TypeName = "bigint")]
         public DeliveryBoxStatus Status { get; set; }
             = DeliveryBoxStatus.Loading;

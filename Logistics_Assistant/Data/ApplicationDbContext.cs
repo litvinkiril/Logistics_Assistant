@@ -15,6 +15,10 @@ namespace Logistics_Assistant.Data
         public DbSet<NeedToDeliver> NeedToDeliverItems { get; set; }
         public DbSet<DeliveryOrder> DeliveryOrders { get; set; }
         public DbSet<DeliveryOrderBox> DeliveryOrderBoxes { get; set; }
+        public DbSet<ProductUnit> ProductUnits { get; set; }
+        public DbSet<DeliveryOrderNeed> DeliveryOrderNeeds { get; set; }
+        public DbSet<DeliveryOrderUnit> DeliveryOrderUnits { get; set; }
+        public DbSet<BoxMovement> BoxMovements { get; set; }
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options)
             : base(options)
@@ -77,6 +81,8 @@ namespace Logistics_Assistant.Data
                     );
                 });
             });
+
+            LogisticsModelConfiguration.Configure(modelBuilder);
         }
     }
 }
