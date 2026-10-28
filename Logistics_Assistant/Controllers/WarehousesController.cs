@@ -1,66 +1,66 @@
-﻿using Logistics_Assistant.Services.Warehouses;
+﻿using Logistics_Assistant.Services.LogisticsPoints;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Logistics_Assistant.Controllers
 {
     [ApiController]
-    [Route("api/warehouses")]
-    public class WarehousesController : ControllerBase
+    [Route("api/logistics-points")]
+    public class LogisticsPointsController : ControllerBase
     {
-        private readonly WarehouseStockService _warehouses;
+        private readonly LogisticsPointService _points;
 
-        public WarehousesController(WarehouseStockService warehouses)
+        public LogisticsPointsController(LogisticsPointService points)
         {
-            _warehouses = warehouses;
+            _points = points;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetWarehousesAsync(
+        public async Task<IActionResult> GetPointsAsync(
+            [FromQuery] string? type,
             CancellationToken cancellationToken)
         {
-            var warehouses = await _warehouses.GetWarehousesAsync(
+            var points = await _points.GetPointsAsync(
+                type,
                 cancellationToken);
 
-            return Ok(warehouses);
+            return Ok(points);
         }
 
         [HttpGet("{id:long}")]
         public async Task<IActionResult> GetByIdAsync(
-    long id,
-    CancellationToken cancellationToken)
+            long id,
+            CancellationToken cancellationToken)
         {
             if (id <= 0)
             {
-                return BadRequest("ID должен быть положительным числом.");
+                return BadRequest(
+                    "ID должен быть положительным числом.");
             }
 
-            var warehouse = await _warehouses.GetWarehouseByIdAsync(
+            var point = await _points.GetPointByIdAsync(
                 id,
                 cancellationToken);
 
-            if (warehouse is null)
+            if (point is null)
             {
-                return NotFound("Склад не найден.");
+                return NotFound("Точка не найдена.");
             }
 
-            return Ok(warehouse);
+            return Ok(point);
         }
 
         [HttpGet("search")]
-        public async Task<IActionResult> SearchByNameAsync(
-            [FromQuery] string? name,
+        public async Task<IActionResult> SearchAsync(
+            [FromQuery] string? query,
+            [FromQuery] string? type,
             CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return BadRequest("Укажи название склада.");
-            }
-
-            var warehouses = await _warehouses.SearchWarehousesByNameAsync(
-                name,
+            var points = await _points.SearchPointsAsync(
+                query,
+                type,
                 cancellationToken);
 
-            return Ok(warehouses);
+            return Ok(points);
         }
     }
 }
