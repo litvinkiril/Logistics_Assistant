@@ -49,7 +49,7 @@ public sealed class LogisticsPointsFixture : IAsyncLifetime
                 Point(7, @"Склад \Архив", "warehouse", "Самара", "ул. Архивная, 2"),
                 Point(8, "ПВЗ Сокол", "pvz", "Москва", "ул. Алабяна, 9", false));
             db.Products.AddRange(
-                new Product { Id = 1, Name = "Тестовый шкаф" },
+                new Product { Id = 1, Name = "Тестовый шкаф", Url = "https://example.test/products/cabinet?ref=one&part=two" },
                 new Product { Id = 2, Name = "Тестовый стол" },
                 new Product { Id = 3, Name = "Товар без остатков" });
             await db.SaveChangesAsync();

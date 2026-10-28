@@ -1,4 +1,5 @@
 using Logistics_Assistant.Data;
+using Logistics_Assistant.DTOs.Products;
 using Logistics_Assistant.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -59,5 +60,53 @@ namespace Logistics_Assistant.Services.Products
                 .Take(PageSize)
                 .ToListAsync(cancellationToken);
         }
+
+        public async Task<ProductStockResponse?> SearchProductStockAtPointAsync(
+            long productId,
+            long pointId,
+            CancellationToken cancellationToken)
+                {
+                    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(productId);
+                    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pointId);
+
+                    var product = await _db.Products
+                        .AsNoTracking()
+                        .SingleOrDefaultAsync(
+                            product => product.Id == productId,
+                            cancellationToken);
+
+                    if (product is null)
+                        return null;
+
+                    var point = await _db.LogisticsPoints
+                        .AsNoTracking()
+                        .SingleOrDefaultAsync(
+                            point => point.Id == pointId,
+                            cancellationToken);
+
+                    if (point is null)
+                        return null;
+
+                    var quantity = await _db.WarehouseProducts
+                        .AsNoTracking()
+                        .Where(stock =>
+                            stock.ProductId == productId &&
+                            stock.LogisticsPointId == pointId)
+                        .Select(stock => (int?)stock.Quantity)
+                        .SingleOrDefaultAsync(cancellationToken);
+
+                    return new ProductStockResponse
+                    {
+                        Product = product,
+                        Warehouses = new List<WarehouseStockDto>
+                {
+                    new WarehouseStockDto
+                    {
+                        Warehouse = point,
+                        Quantity = quantity ?? 0
+                    }
+                }
+                    };
+                }
     }
 }

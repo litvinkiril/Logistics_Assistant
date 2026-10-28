@@ -98,10 +98,11 @@ GET /api/logistics-points/search?query=Москва&type=pvz
   Адрес взят из текущего HTTPS-профиля проекта; при другом запуске поменяйте baseUrl.
   Ответы зависят от ваших данных; ID 1 замените на существующий ID точки.
 
-Во время работы исправлены оставшиеся ссылки на удалённый WarehouseStockService:
-Program, Razor-страница поиска и её прежние тесты используют LogisticsPointService.
-Метод получения остатков перенесён в этот сервис; удалённый файл не восстанавливался.
-Модели и миграции в этом изменении не редактировались.
+Оставшиеся ссылки на удалённый WarehouseStockService заменены на LogisticsPointService.
+Метод получения остатков находится в этом сервисе; удалённый файл не восстанавливался.
+Позднее обработчики товаров перенесены из Razor Pages в ProductsController:
+актуальные маршруты описаны в `controllers-api.md`. Число тестов полного решения
+растёт; приведённые выше 60 — результат проверки на этапе добавления тестов точек.
 
 Методика: [интеграционные тесты ASP.NET Core](https://learn.microsoft.com/en-us/aspnet/core/test/integration-tests?view=aspnetcore-10.0),
 [перевод ILIKE в Npgsql](https://www.npgsql.org/efcore/mapping/translations.html).

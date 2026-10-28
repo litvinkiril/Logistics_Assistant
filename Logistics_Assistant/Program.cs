@@ -20,16 +20,15 @@ namespace Logistics_Assistant
                 builder.Services);
             builder.Services.AddScoped<ProductSearchService>();
             builder.Services.AddScoped<LogisticsPointService>();
-            // Add services to the container.
-            builder.Services.AddRazorPages();
             builder.Services.AddControllers();
+            builder.Services.AddProblemDetails();
 
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
             if (!app.Environment.IsDevelopment())
             {
-                app.UseExceptionHandler("/Error");
+                app.UseExceptionHandler("/error");
                 app.UseHsts();
             }
 
@@ -37,11 +36,10 @@ namespace Logistics_Assistant
 
             app.UseRouting();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapStaticAssets();
-            app.MapRazorPages()
-               .WithStaticAssets();
             app.MapControllers();
 
             app.Run();

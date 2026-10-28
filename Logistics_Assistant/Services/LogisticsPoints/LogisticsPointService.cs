@@ -14,7 +14,7 @@ namespace Logistics_Assistant.Services.LogisticsPoints
             _db = db;
         }
 
-        // Retains the existing product-stock page after replacing WarehouseStockService.
+        // Used by ProductsController to return stock across warehouses and pickup points.
         public Task<ProductStockResponse?> SearchProductStockByIdAsync(
             long productId,
             CancellationToken cancellationToken)

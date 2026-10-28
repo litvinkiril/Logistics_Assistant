@@ -1,0 +1,23 @@
+@baseUrl = https://localhost:7222
+@productId = 1
+
+### Описание API
+GET {{baseUrl}}/
+
+### Товар по ID: массив из одного элемента либо 404
+GET {{baseUrl}}/api/products/{{productId}}
+
+### Поиск по имени
+GET {{baseUrl}}/api/products/search?name=шкаф&offset=0
+
+### Следующая страница
+GET {{baseUrl}}/api/products/search?name=шкаф&offset=10
+
+### Поиск по точному URL (замените значение своим, с URL-кодированием)
+GET {{baseUrl}}/api/products/by-url?url=https%3A%2F%2Fexample.test%2Fproducts%2Fcabinet%3Fref%3Done%26part%3Dtwo
+
+### Наличие по складам и ПВЗ
+GET {{baseUrl}}/api/products/{{productId}}/stock
+
+### Проверка валидации: 400
+GET {{baseUrl}}/api/products/search?name=шкаф&offset=-1
