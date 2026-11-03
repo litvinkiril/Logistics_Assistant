@@ -12,16 +12,20 @@ namespace Logistics_Assistant
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            CacheConfiguration.ConfigureCache(
+                builder.Services,
+                builder.Configuration);
+
             DatabaseConfiguration.ConfigureDatabase(
                 builder.Services,
                 builder.Configuration);
 
             IdentityConfiguration.ConfigureIdentity(
                 builder.Services);
-            builder.Services.AddScoped<ProductSearchService>();
-            builder.Services.AddScoped<LogisticsPointService>();
-            builder.Services.AddControllers();
-            builder.Services.AddProblemDetails();
+                builder.Services.AddScoped<ProductSearchService>();
+                builder.Services.AddScoped<LogisticsPointService>();
+                builder.Services.AddControllers();
+                builder.Services.AddProblemDetails();
 
             var app = builder.Build();
 

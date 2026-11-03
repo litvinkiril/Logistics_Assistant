@@ -2,19 +2,29 @@
 using Logistics_Assistant.Models;
 using Logistics_Assistant.DTOs.Products;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Logistics_Assistant.Services.LogisticsPoints
 {
     public class LogisticsPointService
     {
         private readonly ApplicationDbContext _db;
+        private readonly HybridCache _cache;
 
-        public LogisticsPointService(ApplicationDbContext db)
+        private static readonly HybridCacheEntryOptions PointCacheOptions = new()
+        {
+            Expiration = TimeSpan.FromMinutes(10),
+            LocalCacheExpiration = TimeSpan.FromMinutes(1)
+        };
+
+        public LogisticsPointService(
+            ApplicationDbContext db,
+            HybridCache cache)
         {
             _db = db;
+            _cache = cache;
         }
 
-        // Used by ProductsController to return stock across warehouses and pickup points.
         public Task<ProductStockResponse?> SearchProductStockByIdAsync(
             long productId,
             CancellationToken cancellationToken)
@@ -49,53 +59,74 @@ namespace Logistics_Assistant.Services.LogisticsPoints
                 cancellationToken: cancellationToken);
         }
 
-        public Task<LogisticsPoint?> GetPointByIdAsync(
-            long id,
-            CancellationToken cancellationToken)
+        public async Task<LogisticsPoint?> GetPointByIdAsync(
+        long id,
+        CancellationToken cancellationToken)
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
 
-            return _db.LogisticsPoints
-                .AsNoTracking()
-                .SingleOrDefaultAsync(
-                    point => point.Id == id,
-                    cancellationToken);
+            var key = $"logistics-points:by-id:v1:{id}";
+
+            return await _cache.GetOrCreateAsync<LogisticsPoint?>(
+                key,
+                async token => await _db.LogisticsPoints
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        point => point.Id == id,
+                        token),
+                options: PointCacheOptions,
+                tags: ["logistics-points"],
+                cancellationToken: cancellationToken);
         }
 
-        public Task<List<LogisticsPoint>> SearchPointsAsync(
+        public async Task<List<LogisticsPoint>> SearchPointsAsync(
             string? query,
             string? type,
             CancellationToken cancellationToken)
         {
-            var points = _db.LogisticsPoints.AsNoTracking();
+            var searchQuery = query?.Trim() ?? string.Empty;
+            var pointType = type?.Trim() ?? string.Empty;
 
-            if (!string.IsNullOrWhiteSpace(type))
-            {
-                var pointType = type.Trim();
+            var key =
+                $"logistics-points:search:v1:" +
+                $"{pointType.Length}:{pointType}:" +
+                $"{searchQuery.Length}:{searchQuery}";
 
-                points = points.Where(
-                    point => point.Type == pointType);
-            }
+            return await _cache.GetOrCreateAsync<List<LogisticsPoint>>(
+                key,
+                async token =>
+                {
+                    var points = _db.LogisticsPoints.AsNoTracking();
 
-            if (!string.IsNullOrWhiteSpace(query))
-            {
-                var text = query.Trim()
-                    .Replace("\\", "\\\\")
-                    .Replace("%", "\\%")
-                    .Replace("_", "\\_");
+                    if (pointType.Length > 0)
+                    {
+                        points = points.Where(
+                            point => point.Type == pointType);
+                    }
 
-                var pattern = $"%{text}%";
+                    if (searchQuery.Length > 0)
+                    {
+                        var text = searchQuery
+                            .Replace("\\", "\\\\")
+                            .Replace("%", "\\%")
+                            .Replace("_", "\\_");
 
-                points = points.Where(point =>
-                    EF.Functions.ILike(point.Name, pattern, "\\") ||
-                    EF.Functions.ILike(point.City, pattern, "\\") ||
-                    EF.Functions.ILike(point.Address, pattern, "\\"));
-            }
+                        var pattern = $"%{text}%";
 
-            return points
-                .OrderBy(point => point.Name)
-                .ThenBy(point => point.Id)
-                .ToListAsync(cancellationToken);
+                        points = points.Where(point =>
+                            EF.Functions.ILike(point.Name, pattern, "\\") ||
+                            EF.Functions.ILike(point.City, pattern, "\\") ||
+                            EF.Functions.ILike(point.Address, pattern, "\\"));
+                    }
+
+                    return await points
+                        .OrderBy(point => point.Name)
+                        .ThenBy(point => point.Id)
+                        .ToListAsync(token);
+                },
+                options: PointCacheOptions,
+                tags: ["logistics-points"],
+                cancellationToken: cancellationToken);
         }
     }
 }

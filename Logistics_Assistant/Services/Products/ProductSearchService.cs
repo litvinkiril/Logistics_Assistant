@@ -2,6 +2,7 @@ using Logistics_Assistant.Data;
 using Logistics_Assistant.DTOs.Products;
 using Logistics_Assistant.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Logistics_Assistant.Services.Products
 {
@@ -9,20 +10,38 @@ namespace Logistics_Assistant.Services.Products
     {
         private const int PageSize = 10;
         private readonly ApplicationDbContext _db;
+        private readonly HybridCache _cache;
 
-        public ProductSearchService(ApplicationDbContext db)
+        private static readonly HybridCacheEntryOptions ProductCacheOptions = new()
+        {
+            Expiration = TimeSpan.FromMinutes(10),
+            LocalCacheExpiration = TimeSpan.FromMinutes(1)
+        };
+
+        public ProductSearchService(
+            ApplicationDbContext db,
+            HybridCache cache)
         {
             _db = db;
+            _cache = cache;
         }
 
-        public Task<List<Product>> SearchByIdAsync(
+        public async Task<List<Product>> SearchByIdAsync(
             long id,
             CancellationToken cancellationToken)
         {
-            return _db.Products
-                .AsNoTracking()
-                .Where(product => product.Id == id)
-                .ToListAsync(cancellationToken);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+
+            var key = $"products:by-id:v2:{id}";
+
+            return await _cache.GetOrCreateAsync<List<Product>>(
+                key,
+                async token => await _db.Products
+                    .AsNoTracking()
+                    .Where(product => product.Id == id)
+                    .ToListAsync(token),
+                options: ProductCacheOptions,
+                cancellationToken: cancellationToken);
         }
 
         public Task<List<Product>> SearchByNameAsync(
@@ -45,20 +64,25 @@ namespace Logistics_Assistant.Services.Products
                 .ToListAsync(cancellationToken);
         }
 
-        public Task<List<Product>> SearchByUrlAsync(
+        public async Task<List<Product>> SearchByUrlAsync(
             string url,
             CancellationToken cancellationToken)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(url);
 
             var searchUrl = url.Trim();
+            var key = $"products:by-url:v1:{searchUrl}";
 
-            return _db.Products
-                .AsNoTracking()
-                .Where(product => product.Url == searchUrl)
-                .OrderBy(product => product.Id)
-                .Take(PageSize)
-                .ToListAsync(cancellationToken);
+            return await _cache.GetOrCreateAsync<List<Product>>(
+                key,
+                async token => await _db.Products
+                    .AsNoTracking()
+                    .Where(product => product.Url == searchUrl)
+                    .OrderBy(product => product.Id)
+                    .Take(PageSize)
+                    .ToListAsync(token),
+                options: ProductCacheOptions,
+                cancellationToken: cancellationToken);
         }
 
         public async Task<ProductStockResponse?> SearchProductStockAtPointAsync(
