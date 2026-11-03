@@ -44,6 +44,8 @@ internal static class LogisticsModelConfiguration
         {
             entity.HasOne<IdentityUser>().WithMany().HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<IdentityUser>().WithMany().HasForeignKey(x => x.ResponsibleUserId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<LogisticsPoint>().WithMany().HasForeignKey(x => x.SourcePointId)
                 .OnDelete(DeleteBehavior.Restrict);
             // Historical zero values are not silently changed in this migration.

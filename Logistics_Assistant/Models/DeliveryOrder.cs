@@ -14,6 +14,9 @@ namespace Logistics_Assistant.Models
         [Column("user_id")]
         public string UserId { get; set; } = string.Empty;
 
+        [Column("responsible_user_id")]
+        public string? ResponsibleUserId { get; set; }
+
         [Column("car_plate")]
         [MaxLength(20)]
         public string? CarPlate { get; set; }

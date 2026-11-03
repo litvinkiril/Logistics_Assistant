@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using Microsoft.Extensions.DependencyInjection;
 using Logistics_Assistant.Configuration;
+using Logistics_Assistant.Models;
+using Microsoft.AspNetCore.Identity;
 
 namespace Logistics_Assistant.Tests;
 
@@ -18,6 +20,51 @@ public sealed class LogisticsMigrationTests
     {
         using var db = CreateContext("Host=localhost;Database=unused;Username=unused");
         Assert.False(db.Database.HasPendingModelChanges());
+    }
+
+    [PostgresFact]
+    public async Task ResponsibleUserIsOptionalAndIndependentFromOrderUser()
+    {
+        const string previous = "20261028143308_AddDeliveryPlanningAndBoxTracking";
+        await using var database = await TestDatabase.CreateAsync();
+        await using var db = CreateContext(database.ConnectionString);
+        await db.GetService<IMigrator>().MigrateAsync(previous);
+        await db.Database.ExecuteSqlRawAsync(LegacySeed);
+        await db.Database.MigrateAsync();
+
+        var existing = await db.DeliveryOrders.SingleAsync();
+        Assert.Equal("test-user", existing.UserId);
+        Assert.Null(existing.ResponsibleUserId);
+
+        db.Users.Add(new IdentityUser { Id = "responsible-user", UserName = "responsible-user" });
+        db.DeliveryOrders.Add(new DeliveryOrder { Id = 2, UserId = "test-user" });
+        await db.SaveChangesAsync();
+        existing.ResponsibleUserId = "responsible-user";
+        await db.SaveChangesAsync();
+
+        var assigned = await db.DeliveryOrders.AsNoTracking().SingleAsync(order => order.Id == 1);
+        Assert.Equal("test-user", assigned.UserId);
+        Assert.Equal("responsible-user", assigned.ResponsibleUserId);
+        Assert.Null((await db.DeliveryOrders.AsNoTracking().SingleAsync(order => order.Id == 2)).ResponsibleUserId);
+        await Reject(db, "UPDATE delivery_orders SET responsible_user_id='missing-user' WHERE id=2", "23503");
+        await Reject(db, "UPDATE delivery_orders SET responsible_user_id='' WHERE id=2", "23503");
+        var deleteError = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(
+            "DELETE FROM \"AspNetUsers\" WHERE \"Id\"='responsible-user'"));
+        // PostgreSQL versions report RESTRICT separately from an invalid foreign key.
+        Assert.Contains(deleteError.SqlState, new[] { "23503", "23001" });
+
+        existing.ResponsibleUserId = null;
+        await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM \"AspNetUsers\" WHERE \"Id\"='responsible-user'");
+
+        await db.GetService<IMigrator>().MigrateAsync(previous);
+        await db.Database.MigrateAsync();
+        Assert.Equal(2, await db.DeliveryOrders.CountAsync());
+        Assert.All(await db.DeliveryOrders.AsNoTracking().ToListAsync(), order =>
+        {
+            Assert.Equal("test-user", order.UserId);
+            Assert.Null(order.ResponsibleUserId);
+        });
     }
 
     [PostgresFact]

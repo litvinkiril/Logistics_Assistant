@@ -163,6 +163,10 @@ namespace Logistics_Assistant.Migrations
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("max_load_kg");
 
+                    b.Property<string>("ResponsibleUserId")
+                        .HasColumnType("text")
+                        .HasColumnName("responsible_user_id");
+
                     b.Property<long?>("SourcePointId")
                         .HasColumnType("bigint")
                         .HasColumnName("source_point_id");
@@ -179,6 +183,8 @@ namespace Logistics_Assistant.Migrations
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ResponsibleUserId");
 
                     b.HasIndex("SourcePointId");
 
@@ -810,6 +816,11 @@ namespace Logistics_Assistant.Migrations
 
             modelBuilder.Entity("Logistics_Assistant.Models.DeliveryOrder", b =>
                 {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("ResponsibleUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Logistics_Assistant.Models.LogisticsPoint", null)
                         .WithMany()
                         .HasForeignKey("SourcePointId")
