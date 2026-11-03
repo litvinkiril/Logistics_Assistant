@@ -4,11 +4,17 @@ using Logistics_Assistant.Services.LogisticsPoints;
 using Logistics_Assistant.Services.Products;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Logistics_Assistant.Tests;
 
-public class ProductsControllerValidationTests
+public class ProductsControllerValidationTests : IDisposable
 {
+    private readonly ServiceProvider _cacheServices = TestCache.CreateServices();
+
+    public void Dispose() => _cacheServices.Dispose();
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -52,8 +58,11 @@ public class ProductsControllerValidationTests
         Assert.Equal("Укажи URL товара.", Assert.IsType<BadRequestObjectResult>(result).Value);
     }
 
-    private static ProductsController CreateController(ApplicationDbContext db) =>
-        new(new ProductSearchService(db), new LogisticsPointService(db));
+    private ProductsController CreateController(ApplicationDbContext db)
+    {
+        var cache = _cacheServices.GetRequiredService<HybridCache>();
+        return new(new ProductSearchService(db, cache), new LogisticsPointService(db, cache));
+    }
 
     private static ApplicationDbContext CreateDbContext() =>
         new(new DbContextOptionsBuilder<ApplicationDbContext>().Options);

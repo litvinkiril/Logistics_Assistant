@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
@@ -101,6 +102,9 @@ public sealed class LogisticsPointsFixture : IAsyncLifetime
             builder.UseEnvironment("Testing");
             builder.ConfigureTestServices(services =>
             {
+                // These tests exercise PostgreSQL and HTTP, with an isolated local cache.
+                // Never read seeded IDs from the application's Redis on localhost.
+                services.RemoveAll<IDistributedCache>();
                 services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
                 services.RemoveAll<IDbContextOptionsConfiguration<ApplicationDbContext>>();
                 services.RemoveAll<ApplicationDbContext>();

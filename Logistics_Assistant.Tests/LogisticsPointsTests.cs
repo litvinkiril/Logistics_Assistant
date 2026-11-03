@@ -6,14 +6,19 @@ using Logistics_Assistant.Models;
 using Logistics_Assistant.Services.LogisticsPoints;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
 namespace Logistics_Assistant.Tests;
 
 [Trait("Feature", "LogisticsPoints")]
-public sealed class LogisticsPointsValidationTests
+public sealed class LogisticsPointsValidationTests : IDisposable
 {
+    private readonly ServiceProvider _cacheServices = TestCache.CreateServices();
+
+    public void Dispose() => _cacheServices.Dispose();
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -21,7 +26,8 @@ public sealed class LogisticsPointsValidationTests
     public async Task ControllerRejectsNonpositiveIdWithoutQueryingDatabase(long id)
     {
         using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().Options);
-        var controller = new LogisticsPointsController(new LogisticsPointService(db));
+        var controller = new LogisticsPointsController(new LogisticsPointService(
+            db, _cacheServices.GetRequiredService<HybridCache>()));
         var result = await controller.GetByIdAsync(id, CancellationToken.None);
         var error = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("ID должен быть положительным числом.", error.Value);
@@ -33,7 +39,7 @@ public sealed class LogisticsPointsValidationTests
     public async Task ServiceRejectsNonpositiveId(long id)
     {
         using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().Options);
-        var service = new LogisticsPointService(db);
+        var service = new LogisticsPointService(db, _cacheServices.GetRequiredService<HybridCache>());
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.GetPointByIdAsync(id, CancellationToken.None));
     }
 }
