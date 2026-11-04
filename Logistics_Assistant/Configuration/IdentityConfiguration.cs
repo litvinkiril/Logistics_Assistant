@@ -17,6 +17,11 @@ namespace Logistics_Assistant.Configuration
 
             services.ConfigureApplicationCookie(options =>
             {
+                options.Cookie.Name = "Logistics.Auth";
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.ExpireTimeSpan = TimeSpan.FromDays(7);
+                options.SlidingExpiration = true;
                 options.Events.OnRedirectToLogin = context =>
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -35,11 +40,20 @@ namespace Logistics_Assistant.Configuration
                     // Preserve the existing Identity model after removing AddDefaultIdentity/UI.
                     options.Stores.MaxLengthForKeys = 128;
                     options.User.RequireUniqueEmail = true;
-                    options.SignIn.RequireConfirmedAccount = true;
+                    options.SignIn.RequireConfirmedAccount = false;
+                    options.SignIn.RequireConfirmedEmail = false;
+                    options.SignIn.RequireConfirmedPhoneNumber = false;
+                    options.Password.RequiredLength = 8;
+                    options.Password.RequireDigit = false;
+                    options.Password.RequireLowercase = false;
+                    options.Password.RequireUppercase = false;
+                    options.Password.RequireNonAlphanumeric = false;
                 })
                 .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddSignInManager()
                 .AddDefaultTokenProviders();
+
+            services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
         }
     }
 }

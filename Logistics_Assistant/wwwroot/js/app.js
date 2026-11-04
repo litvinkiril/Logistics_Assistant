@@ -1,8 +1,12 @@
+import { deliveryProducts, cargoState } from './delivery-data.js';
+import { createAuth } from './auth.js';
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const main = $('#main');
 const historyKey = 'logistics-assistant:searches:v1';
 const modes = { name: { label: 'Название', placeholder: 'Например, стеллаж', hint: 'Найдём все совпадения по части названия.', icon: 'search' }, id: { label: 'ID', placeholder: 'Введите ID товара', hint: 'Укажите положительный числовой ID товара.', icon: 'hash' }, url: { label: 'URL', placeholder: 'https://…', hint: 'Вставьте полную ссылку на страницу товара.', icon: 'link' } };
 let navigation, view = {};
+const assigningDeliveries = new Set();
 let savedSearchRoute = '#/products', savedPointRoute = '#/points';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const icon = name => `<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#${name}"/></svg>`;
@@ -19,6 +23,14 @@ const notice = text => `<div class="notice">${icon('info')}<span>${text}</span><
 const loading = (label = 'Загружаем данные') => `<div class="loading-state" role="status" aria-label="${label}"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><p class="loading-label">${label}…</p></div>`;
 const empty = (name, title, text, extra = '') => `<div class="empty-state">${art(name)}<h2>${title}</h2><p>${text}</p>${extra}</div>`;
 const heading = (title, text, refresh = true) => `<div class="page-heading"><div><div class="eyebrow">ВАШ ЛОГИСТИЧЕСКИЙ ПОМОЩНИК</div><h1>${title}</h1><p>${text}</p></div>${refresh ? `<button class="button" data-action="refresh" aria-label="Обновить данные">${icon('refresh')}Обновить</button>` : ''}</div>`;
+const auth = createAuth({ main, escape, icon, navigate, onUserChange: renderAccount });
+function renderAccount(user) {
+  setConnection('online', 'Подключено к приложению');
+  $('#account-controls').innerHTML = user
+    ? `<span class="account-email" title="${escape(user.email)}">${escape(user.email)}</span><button class="button" type="button" data-action="logout">Выйти</button>`
+    : '<a class="button" href="#/login">Войти</a>';
+  $('#account-error').textContent = '';
+}
 function setConnection(state, label) {
   $('#connection').className = `connection ${state}`;
   $('#connection').innerHTML = `<i></i><span>${label}</span>`;
@@ -33,10 +45,11 @@ async function api(path, signal) {
   const timer = setTimeout(abort, 15000);
   try {
     const response = await fetch(path, { signal: controller.signal, headers: { Accept: 'application/json' }, cache: 'no-store' });
+    if (response.status === 401 && !signal?.aborted) auth.expire();
     if (!response.ok) { if (!signal?.aborted) setConnection(response.status >= 500 ? 'offline' : 'online', response.status >= 500 ? 'Ошибка загрузки' : 'Подключено к приложению'); throw new ApiError(response.status); }
     // Preserve Int64 IDs using the source token supported by modern browsers.
     const data = JSON.parse(await response.text(), (key, value, context) => {
-      if (key !== 'id' || typeof value !== 'number') return value;
+      if ((key !== 'id' && !key.endsWith('Id')) || typeof value !== 'number') return value;
       if (!context?.source && !Number.isSafeInteger(value)) throw new ApiError(0);
       return context?.source ?? String(value);
     });
@@ -215,14 +228,173 @@ async function renderPoint(id, params, signal) {
     if (view.query) loadPointProducts(signal);
   } catch (error) { if (!signal.aborted) main.innerHTML = `${back}<section class="panel">${errorMarkup(error)}</section>`; }
 }
-function renderDeliveries() {
-  view = { section: 'deliveries' };
-  main.innerHTML = `${heading('Доставки', 'Рабочее место для планирования и отслеживания перевозок.', false)}<section class="panel delivery-panel"><div class="empty-state">${art('truck')}<span class="coming-label">В РАЗРАБОТКЕ</span><h2>Здесь будут ваши доставки</h2><p>Раздел появится после подключения операций с доставками. А пока можно найти нужный товар и проверить, на каких складах он есть.</p><a class="button primary" href="#/products">${icon('search')}Найти товар</a></div><div class="delivery-features"><div>${icon('truck')}Планирование<br>маршрутов</div><div>${icon('box')}Работа<br>с коробками</div><div>${icon('check')}Отслеживание<br>доставок</div></div></section>`;
+function deliveryStatus(status) {
+  const labels = { new: 'Новый', planned: 'Запланирован', assigned: 'Назначен', loading: 'Погрузка', in_transit: 'В пути', completed: 'Завершён', delivered: 'Доставлен', cancelled: 'Отменён' };
+  return `<span class="badge">${escape(labels[status] || 'Статус не указан')}</span>`;
+}
+function deliveryDate(value) {
+  const date = new Date(value);
+  return value && !Number.isNaN(date.getTime()) ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(date) : 'Не указана';
+}
+function deliveryOverview(order) {
+  if (!order) return '';
+  return `<section class="panel delivery-overview"><div id="delivery-feedback" role="status"></div><div class="delivery-vehicle"><span class="point-avatar">${icon('truck')}</span><div><strong>${escape(order.carPlate || 'Машина не указана')}</strong><small>Создан ${escape(deliveryDate(order.createdAt))}</small></div>${deliveryStatus(order.status)}</div>${order.contactPhone ? `<p class="delivery-contact">Контакт: ${escape(order.contactPhone)}</p>` : ''}<div id="delivery-assignment" class="delivery-assignment">${deliveryAssignment(order)}</div></section>`;
+}
+function deliveryAssignment(order) {
+  if (order.responsibleUserId) {
+    const mine = String(order.responsibleUserId) === String(auth.user?.id);
+    return `<span class="assignment-status ${mine ? 'mine' : ''}" role="status">${icon(mine ? 'check' : 'info')}${mine ? 'Вы ответственный за рейс' : 'Ответственный уже назначен'}</span>`;
+  }
+  const pending = assigningDeliveries.has(String(order.id));
+  return `<button class="button primary assign-delivery" type="button" data-action="assign-delivery" data-delivery-id="${escape(order.id)}" ${pending ? 'disabled aria-busy="true"' : ''}>${icon('check')}${pending ? 'Назначаем…' : 'Взять рейс на себя'}</button>`;
+}
+function deliveryFeedback(message, error = false) {
+  const feedback = $('#delivery-feedback');
+  if (!feedback) return;
+  feedback.setAttribute('role', error ? 'alert' : 'status');
+  feedback.className = `delivery-feedback ${error ? 'is-error' : ''}`;
+  feedback.textContent = message;
+}
+async function assignDelivery(id) {
+  if (validate('id', id) || assigningDeliveries.has(id)) return;
+  const current = view;
+  const signal = navigation.signal;
+  assigningDeliveries.add(id);
+  deliveryFeedback('');
+  document.querySelectorAll('[data-action="assign-delivery"]').forEach(button => {
+    if (button.dataset.deliveryId === id) { button.disabled = true; button.setAttribute('aria-busy', 'true'); button.textContent = 'Назначаем…'; }
+  });
+  try {
+    await auth.mutate(`/api/delivery-orders/${encodeURIComponent(id)}/assign`, 'PATCH');
+    if (view !== current || signal.aborted) return;
+    if (current.deliveryId && current.order) {
+      current.order.responsibleUserId = auth.user.id;
+      $('#delivery-assignment').innerHTML = deliveryAssignment(current.order);
+      deliveryFeedback('Рейс назначен на вас.');
+    } else navigate(`#/deliveries/${id}`);
+  } catch (error) {
+    if (view !== current || signal.aborted || error.status === 401) return;
+    if (error.status === 409 || error.status === 404) {
+      if (!current.deliveryId) {
+        await loadDeliveries(signal);
+      } else if (error.status === 409) {
+        try {
+          const data = await api(`/api/delivery-orders/${encodeURIComponent(id)}`, signal);
+          if (view !== current || signal.aborted) return;
+          current.order = data.order;
+          if (current.order) $('#delivery-assignment').innerHTML = deliveryAssignment(current.order);
+        } catch { /* Keep the server's assignment error if refreshing fails. */ }
+      } else { route(); return; }
+      if (view !== current || signal.aborted) return;
+    }
+    deliveryFeedback(error.status === 409 ? 'У рейса уже есть ответственный. Данные обновлены.' : error.message, true);
+  } finally {
+    assigningDeliveries.delete(id);
+    if (view === current && !signal.aborted) document.querySelectorAll('[data-action="assign-delivery"]').forEach(button => {
+      if (button.dataset.deliveryId === id) { button.disabled = false; button.removeAttribute('aria-busy'); button.innerHTML = `${icon('check')}Взять рейс на себя`; }
+    });
+  }
+}
+function deliveryLookup() {
+  return `<section class="panel delivery-lookup"><div><h2>Открыть рейс</h2><p>Введите номер, чтобы проверить план и груз в машине.</p></div><form id="delivery-lookup" novalidate><label class="sr-only" for="delivery-id">Номер рейса</label><div class="delivery-lookup-fields"><div class="search-input">${icon('hash')}<input id="delivery-id" name="query" inputmode="numeric" placeholder="Номер рейса" maxlength="19" aria-describedby="search-error" autocomplete="off"></div><button class="button primary" type="submit">Открыть ${icon('arrow')}</button></div><p class="field-error" id="search-error" role="alert"></p></form></section>`;
+}
+function renderDeliveryCards() {
+  const orders = view.orders;
+  $('#delivery-list').innerHTML = `<div class="result-header"><h2>Рейсы без ответственного</h2><span class="count-badge">${orders.length}${view.hasMore ? '+' : ''}</span></div>${orders.length ? `<div class="delivery-grid">${orders.map(order => `<article class="delivery-card"><a class="delivery-card-main" href="#/deliveries/${encodeURIComponent(order.id)}"><div class="delivery-card-heading"><span class="point-avatar">${icon('truck')}</span>${deliveryStatus(order.status)}</div><h3>Рейс №${escape(order.id)}</h3><p>${escape(order.carPlate || 'Машина не указана')}</p><div class="delivery-card-footer"><span>${escape(deliveryDate(order.createdAt))}</span><span>Груз ${icon('arrow')}</span></div></a><div class="delivery-card-actions">${deliveryAssignment(order)}</div></article>`).join('')}</div>${view.hasMore ? `<div class="list-bottom"><button class="button full" data-action="delivery-load-more" ${view.loadingMore ? 'disabled' : ''}>${view.loadingMore ? 'Загружаем…' : 'Показать ещё 10'}</button></div>` : ''}` : empty('truck', 'Свободных рейсов пока нет', 'Рейс с назначенным ответственным можно открыть по номеру выше.')}`;
+}
+async function loadDeliveries(signal, append = false) {
+  if (view.loadingMore) return;
+  const current = view;
+  current.loadingMore = true;
+  if (append) renderDeliveryCards();
+  try {
+    const orders = await api(`/api/delivery-orders/unassigned?offset=${append ? current.offset : 0}`, signal);
+    if (signal.aborted) return;
+    if (!Array.isArray(orders)) throw new ApiError(0);
+    current.offset = (append ? current.offset : 0) + orders.length;
+    current.orders = append ? [...current.orders, ...orders] : orders;
+    current.hasMore = orders.length === 10;
+    current.loadingMore = false;
+    renderDeliveryCards();
+  } catch (error) {
+    if (signal.aborted) return;
+    current.loadingMore = false;
+    if (append) {
+      renderDeliveryCards();
+      $('.list-bottom', $('#delivery-list')).insertAdjacentHTML('beforeend', `<p class="field-error" role="alert">${escape(error.message)}</p>`);
+    } else $('#delivery-list').innerHTML = errorMarkup(error);
+  }
+}
+function renderDeliveries(signal) {
+  view = { section: 'deliveries', orders: [], offset: 0, hasMore: false, loadingMore: false };
+  main.innerHTML = `${heading('Доставки', 'Откройте рейс и сравните план с фактической загрузкой.')}<div id="delivery-feedback" role="status"></div>${deliveryLookup()}<section class="panel" id="delivery-list" aria-live="polite">${loading('Загружаем рейсы')}</section>`;
+  loadDeliveries(signal);
+}
+function cargoBadge(product) {
+  const state = cargoState(product);
+  const labels = { unplanned: 'Вне плана', excess: `Сверх плана: ${number(product.inTruckQuantity - product.requiredQuantity)}`, shortage: `Не хватает: ${number(product.requiredQuantity - product.inTruckQuantity)}`, complete: 'По плану' };
+  return `<span class="cargo-badge ${state}">${escape(labels[state])}</span>`;
+}
+function renderCargoRows() {
+  const query = view.cargoQuery.toLocaleLowerCase('ru-RU');
+  const products = view.cargo.filter(product =>
+    (!query || product.productName.toLocaleLowerCase('ru-RU').includes(query) || product.productId.includes(query)) &&
+    (view.cargoFilter === 'all' || (view.cargoFilter === 'differences' ? cargoState(product) !== 'complete' : cargoState(product) === view.cargoFilter)));
+  $('#cargo-count').textContent = `${number(products.length)} из ${number(view.cargo.length)}`;
+  document.querySelectorAll('[data-action="cargo-filter"]').forEach(button => {
+    const active = button.dataset.filter === view.cargoFilter;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  $('#cargo-results').innerHTML = products.length ? `<div class="cargo-table-wrap"><table class="cargo-table"><caption class="sr-only">План и фактическая загрузка рейса. Количество в коробках.</caption><thead><tr><th scope="col">Товар</th><th scope="col" class="cargo-number">Нужно</th><th scope="col" class="cargo-number">В машине</th><th scope="col">Загрузка</th></tr></thead><tbody>${products.map(product => `<tr><th scope="row"><a href="#/products/${encodeURIComponent(product.productId)}">${escape(product.productName)}</a><small>ID ${escape(product.productId)}</small></th><td class="cargo-number">${number(product.requiredQuantity)}</td><td class="cargo-number ${cargoState(product) === 'shortage' ? 'cargo-shortage' : ''}">${number(product.inTruckQuantity)}</td><td>${cargoBadge(product)}</td></tr>`).join('')}</tbody></table></div>` : empty('search', view.cargo.length ? 'Нет подходящих товаров' : 'В рейсе пока нет груза', view.cargo.length ? 'Измените название или выберите другой фильтр.' : 'Здесь появятся товары и количество коробок по плану и в машине.');
+}
+async function renderDelivery(id, signal) {
+  view = { section: 'deliveries', deliveryId: id, cargo: [], cargoQuery: '', cargoFilter: 'all' };
+  const back = `<a class="back-link" href="#/deliveries">${icon('back')}К рейсам</a>`;
+  main.innerHTML = `${back}<section class="panel">${loading('Загружаем груз рейса')}</section>`;
+  try {
+    const data = await api(`/api/delivery-orders/${encodeURIComponent(id)}`, signal);
+    if (signal.aborted) return;
+    if (!Array.isArray(data) && (!data?.order || !Array.isArray(data.items))) throw new ApiError(0);
+    const order = Array.isArray(data) ? null : data.order;
+    view.order = order;
+    view.cargo = deliveryProducts(data);
+    const totals = view.cargo.reduce((sum, product) => ({
+      required: sum.required + product.requiredQuantity,
+      inTruck: sum.inTruck + product.inTruckQuantity,
+      shortage: sum.shortage + Math.max(0, product.requiredQuantity - product.inTruckQuantity)
+    }), { required: 0, inTruck: 0, shortage: 0 });
+    $('#breadcrumb').textContent = `Рейс №${id}`;
+    document.title = `Рейс №${id} — Логистический помощник`;
+    main.innerHTML = `${back}${heading(`Рейс №${escape(id)}`, 'План перевозки и фактический груз в машине.')}${deliveryOverview(order)}<div class="summary-row cargo-summary"><div class="panel summary-item">${icon('box')}<div><strong>${number(totals.required)}</strong><small>Нужно коробок</small></div></div><div class="panel summary-item">${icon('truck')}<div><strong>${number(totals.inTruck)}</strong><small>Коробок в машине</small></div></div><div class="panel summary-item">${icon('layers')}<div><strong>${number(totals.shortage)}</strong><small>Осталось загрузить</small></div></div></div><section class="panel cargo-panel" aria-labelledby="cargo-title"><div class="result-header"><div><h2 id="cargo-title">Товары рейса</h2><p class="cargo-unit">Количество в коробках · все упаковки товара вместе</p></div><span class="count-badge" id="cargo-count"></span></div><div class="cargo-toolbar"><div class="search-input">${icon('search')}<input id="cargo-query" type="search" placeholder="Название или ID товара" aria-label="Поиск по грузу" maxlength="256"></div><div class="segmented" role="group" aria-label="Фильтр груза">${[['all', 'Все'], ['shortage', 'Не хватает'], ['unplanned', 'Вне плана'], ['differences', 'Расхождения']].map(([filter, label]) => `<button type="button" data-action="cargo-filter" data-filter="${filter}" aria-pressed="false">${label}</button>`).join('')}</div></div><div id="cargo-results" aria-live="polite"></div></section>`;
+    renderCargoRows();
+  } catch (error) {
+    if (!signal.aborted) main.innerHTML = `${back}<section class="panel">${errorMarkup(error instanceof ApiError ? error : new ApiError(0))}</section>`;
+  }
 }
 async function route() {
   navigation?.abort(); navigation = new AbortController();
   const signal = navigation.signal, hash = location.hash.startsWith('#/') ? location.hash.slice(1) : '/products';
-  const url = new URL(hash, location.origin), match = url.pathname.match(/^\/(products|points)(?:\/([1-9]\d*))?\/?$/);
+  const authPath = new URL(hash, location.origin).pathname;
+  if (!auth.checked) {
+    main.innerHTML = `<section class="panel">${loading('Проверяем вход')}</section>`;
+    try { await auth.check(); }
+    catch (error) {
+      if (!signal.aborted) main.innerHTML = `<section class="panel">${errorMarkup(error)}</section>`;
+      return;
+    }
+    if (signal.aborted) return;
+  }
+  if (authPath === '/login' || authPath === '/register') {
+    if (auth.user) { navigate(auth.returnTo); return; }
+    document.querySelectorAll('[data-nav]').forEach(link => { link.classList.remove('active'); link.removeAttribute('aria-current'); });
+    $('#breadcrumb').textContent = authPath === '/register' ? 'Регистрация' : 'Вход';
+    view = { section: 'auth' };
+    auth.render(authPath.slice(1));
+    return;
+  }
+  if (!auth.user) { auth.returnTo = location.hash.startsWith('#/') ? location.hash : '#/products'; navigate('#/login'); return; }
+  const url = new URL(hash, location.origin), match = url.pathname.match(/^\/(products|points|deliveries)(?:\/([1-9]\d*))?\/?$/);
   const section = match?.[1] || (url.pathname === '/deliveries' ? 'deliveries' : 'products'), id = match?.[2];
   document.querySelectorAll('[data-nav]').forEach(link => { const active = link.dataset.nav === section; link.classList.toggle('active', active); if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current'); });
   $('#breadcrumb').textContent = section === 'points' ? 'Склады и ПВЗ' : section === 'deliveries' ? 'Доставки' : 'Товары';
@@ -231,7 +403,8 @@ async function route() {
   else if (section === 'products') await renderProduct(id, url.searchParams, signal);
   else if (section === 'points' && !id) { savedPointRoute = location.hash || '#/points'; await renderPoints(url.searchParams, signal); }
   else if (section === 'points') await renderPoint(id, url.searchParams, signal);
-  else renderDeliveries();
+  else if (id) await renderDelivery(id, signal);
+  else renderDeliveries(signal);
 }
 function navigate(hash) { if (location.hash === hash) route(); else location.hash = hash; }
 function updateMode(mode, point = false) {
@@ -251,15 +424,23 @@ function updatePointFilters() {
 }
 document.addEventListener('submit', event => {
   const form = event.target;
-  if (!['product-search', 'point-search', 'point-product-search'].includes(form.id)) return;
+  if (form.id === 'auth-form') { event.preventDefault(); auth.submit(form); return; }
+  if (!['product-search', 'point-search', 'point-product-search', 'delivery-lookup'].includes(form.id)) return;
   event.preventDefault();
   const query = $('input[name="query"]', form).value.trim();
+  if (form.id === 'delivery-lookup') {
+    const error = validate('id', query);
+    showValidation(form, error ? 'Введите положительный номер рейса до 9223372036854775807.' : '');
+    if (!error) navigate(`#/deliveries/${query}`);
+    return;
+  }
   if (form.id === 'point-search') { view.pointQuery = query; updatePointFilters(); return; }
   const error = validate(view.mode, query); showValidation(form, error);
   if (!error) navigate(searchRoute(view.mode, query, form.id === 'point-product-search' ? `/points/${view.pointId}` : '/products'));
 });
 document.addEventListener('input', event => {
-  if (event.target.matches('#point-search input')) { view.pointQuery = event.target.value.trim(); updatePointFilters(); }
+  if (event.target.id === 'cargo-query') { view.cargoQuery = event.target.value.trim(); renderCargoRows(); }
+  else if (event.target.matches('#point-search input')) { view.pointQuery = event.target.value.trim(); updatePointFilters(); }
   else if (event.target.name === 'query') showValidation(event.target.closest('form'), '');
 });
 document.addEventListener('click', event => {
@@ -267,6 +448,13 @@ document.addEventListener('click', event => {
   if (!button) return;
   const action = button.dataset.action;
   if (action === 'refresh') route();
+  else if (action === 'logout') {
+    button.disabled = true;
+    auth.logout().catch(error => { $('#account-error').textContent = error.message; }).finally(() => { button.disabled = false; });
+  }
+  else if (action === 'delivery-load-more') loadDeliveries(navigation.signal, true);
+  else if (action === 'assign-delivery') assignDelivery(button.dataset.deliveryId);
+  else if (action === 'cargo-filter') { view.cargoFilter = button.dataset.filter; renderCargoRows(); }
   else if (action === 'search-mode') updateMode(button.dataset.mode);
   else if (action === 'point-product-mode') updateMode(button.dataset.mode, true);
   else if (action === 'clear-input') { const form = button.closest('form'), input = $('input[name="query"]', form); input.value = ''; showValidation(form, ''); input.focus(); }
@@ -282,7 +470,6 @@ document.addEventListener('click', event => {
   else if (action === 'close-dialog') $('#about-dialog').close();
 });
 window.addEventListener('hashchange', () => { if (location.hash === '#main') { main.focus(); return; } window.scrollTo(0, 0); route(); });
-window.addEventListener('online', () => api('/api/logistics-points', navigation?.signal).catch(() => {}));
+window.addEventListener('online', () => { if (auth.user) api('/api/logistics-points', navigation?.signal).catch(() => {}); });
 window.addEventListener('offline', () => setConnection('offline', 'Нет соединения'));
 route();
-if (!location.hash.startsWith('#/points') && !/^#\/products\/\d/.test(location.hash)) api('/api/logistics-points', navigation.signal).catch(() => {});

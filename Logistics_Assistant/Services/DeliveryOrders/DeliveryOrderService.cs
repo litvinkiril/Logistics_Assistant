@@ -44,6 +44,20 @@ public class DeliveryOrderService
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<DeliveryOrder>> GetByUserIdAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        return _db.DeliveryOrders
+            .AsNoTracking()
+            .Where(order => order.ResponsibleUserId == userId)
+            .OrderBy(order => order.Id)
+            .Take(PageSize)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<AssignResponsibleResult> AssignResponsibleAsync(
         long orderId,
         string userId,

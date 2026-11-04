@@ -173,7 +173,7 @@ public sealed class LogisticsPointsIntegrationTests : IClassFixture<LogisticsPoi
         Assert.NotNull(stock);
         Assert.Equal(new[] { "warehouse", "pvz" }, stock.Warehouses.Select(row => row.Warehouse.Type));
         Assert.Equal(new[] { 12, 3 }, stock.Warehouses.Select(row => row.Quantity));
-        Assert.Equal(0, Assert.Single((await service.SearchProductStockByIdAsync(2, CancellationToken.None))!.Warehouses).Quantity);
+        Assert.Empty((await service.SearchProductStockByIdAsync(2, CancellationToken.None))!.Warehouses);
         Assert.Empty((await service.SearchProductStockByIdAsync(3, CancellationToken.None))!.Warehouses);
         Assert.Null(await service.SearchProductStockByIdAsync(999999, CancellationToken.None));
     }

@@ -22,7 +22,7 @@
       <nav class="main-nav">
         <a href="#/points" data-nav="points"><svg class="icon"><use href="/assets/icons.svg#warehouse"/></svg><span>Склады и ПВЗ</span></a>
         <a href="#/products" data-nav="products"><svg class="icon"><use href="/assets/icons.svg#box"/></svg><span>Товары</span></a>
-        <a href="#/deliveries" data-nav="deliveries"><svg class="icon"><use href="/assets/icons.svg#truck"/></svg><span>Доставки</span><span class="nav-soon">Скоро</span></a>
+        <a href="#/deliveries" data-nav="deliveries"><svg class="icon"><use href="/assets/icons.svg#truck"/></svg><span>Доставки</span></a>
       </nav>
       <div class="sidebar-bottom">
         <div class="sidebar-tip"><svg class="icon"><use href="/assets/icons.svg#spark"/></svg><strong>Всё под рукой</strong><p>Находите товары и проверяйте остатки в одном месте.</p></div>
@@ -30,7 +30,8 @@
       </div>
     </aside>
     <div class="workspace">
-      <header class="topbar"><div class="breadcrumb"><span class="breadcrumb-root">Рабочее пространство</span><span class="breadcrumb-separator">/</span><strong id="breadcrumb">Товары</strong></div><div id="connection" class="connection" role="status"><i></i><span>Проверяем подключение</span></div></header>
+      <header class="topbar"><div class="breadcrumb"><span class="breadcrumb-root">Рабочее пространство</span><span class="breadcrumb-separator">/</span><strong id="breadcrumb">Товары</strong></div><div class="topbar-actions"><div id="connection" class="connection" role="status"><i></i><span>Подключение к приложению</span></div><div id="account-controls"><a class="button" href="#/login">Войти</a></div></div></header>
+      <p id="account-error" class="account-error" role="alert"></p>
       <main id="main" tabindex="-1"></main>
       <footer class="page-footer"><span>Логистический помощник</span><span>Товары · Склады · Остатки</span></footer>
     </div>

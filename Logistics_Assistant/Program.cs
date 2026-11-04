@@ -26,7 +26,7 @@ namespace Logistics_Assistant
                 builder.Services.AddScoped<ProductSearchService>();
                 builder.Services.AddScoped<LogisticsPointService>();
                 builder.Services.AddScoped<DeliveryOrderService>();
-                builder.Services.AddControllers();
+                builder.Services.AddControllersWithViews();
                 builder.Services.AddProblemDetails();
 
             var app = builder.Build();

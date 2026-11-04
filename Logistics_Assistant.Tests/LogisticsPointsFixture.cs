@@ -64,6 +64,7 @@ public sealed class LogisticsPointsFixture : IAsyncLifetime
                 BaseAddress = new Uri("https://localhost"),
                 AllowAutoRedirect = false
             });
+            await AuthTestClient.Register(Client);
         }
         catch
         {

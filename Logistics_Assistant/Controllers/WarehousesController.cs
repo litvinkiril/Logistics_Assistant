@@ -1,9 +1,12 @@
 ﻿using Logistics_Assistant.Services.LogisticsPoints;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Logistics_Assistant.Controllers
 {
     [ApiController]
+    [Authorize]
+    [AutoValidateAntiforgeryToken]
     [Route("api/logistics-points")]
     public class LogisticsPointsController : ControllerBase
     {

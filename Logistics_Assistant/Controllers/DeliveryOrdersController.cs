@@ -8,6 +8,8 @@ using Logistics_Assistant.DTOs.DeliveryOrders;
 namespace Logistics_Assistant.Controllers;
 
 [ApiController]
+[Authorize]
+[AutoValidateAntiforgeryToken]
 [Route("api/delivery-orders")]
 public class DeliveryOrdersController : ControllerBase
 {
@@ -28,6 +30,24 @@ public class DeliveryOrdersController : ControllerBase
 
         var orders = await _orders.GetUnassignedAsync(
             offset, cancellationToken);
+
+        return Ok(orders);
+    }
+
+    [Authorize]
+    [HttpGet("mine")]
+    public async Task<ActionResult<List<DeliveryOrder>>> GetMineAsync(
+    CancellationToken cancellationToken = default)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("user_id");
+
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized("Не удалось определить пользователя.");
+
+        var orders = await _orders.GetByUserIdAsync(
+            userId,
+            cancellationToken);
 
         return Ok(orders);
     }
