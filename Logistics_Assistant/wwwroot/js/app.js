@@ -7,7 +7,7 @@ const historyKey = 'logistics-assistant:searches:v1';
 const modes = { name: { label: 'Название', placeholder: 'Например, стеллаж', hint: 'Найдём все совпадения по части названия.', icon: 'search' }, id: { label: 'ID', placeholder: 'Введите ID товара', hint: 'Укажите положительный числовой ID товара.', icon: 'hash' }, url: { label: 'URL', placeholder: 'https://…', hint: 'Вставьте полную ссылку на страницу товара.', icon: 'link' } };
 let navigation, view = {};
 const assigningDeliveries = new Set();
-let savedSearchRoute = '#/products', savedPointRoute = '#/points';
+let savedSearchRoute = '#/products', savedPointRoute = '#/points', savedDeliveryRoute = '#/deliveries';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const icon = name => `<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#${name}"/></svg>`;
 const number = value => new Intl.NumberFormat('ru-RU').format(value);
@@ -243,7 +243,7 @@ function deliveryOverview(order) {
 function deliveryAssignment(order) {
   if (order.responsibleUserId) {
     const mine = String(order.responsibleUserId) === String(auth.user?.id);
-    return `<span class="assignment-status ${mine ? 'mine' : ''}" role="status">${icon(mine ? 'check' : 'info')}${mine ? 'Вы ответственный за рейс' : 'Ответственный уже назначен'}</span>`;
+    return `<span class="assignment-status ${mine ? 'mine' : ''}" role="status">${icon(mine ? 'check' : 'info')}${mine ? 'Вы ответственный за рейс' : 'Ответственный уже назначен'}</span>${mine ? '<a class="button quiet assignment-mine-link" href="#/deliveries?tab=mine">Мои рейсы</a>' : ''}`;
   }
   const pending = assigningDeliveries.has(String(order.id));
   return `<button class="button primary assign-delivery" type="button" data-action="assign-delivery" data-delivery-id="${escape(order.id)}" ${pending ? 'disabled aria-busy="true"' : ''}>${icon('check')}${pending ? 'Назначаем…' : 'Взять рейс на себя'}</button>`;
@@ -300,20 +300,25 @@ function deliveryLookup() {
 }
 function renderDeliveryCards() {
   const orders = view.orders;
-  $('#delivery-list').innerHTML = `<div class="result-header"><h2>Рейсы без ответственного</h2><span class="count-badge">${orders.length}${view.hasMore ? '+' : ''}</span></div>${orders.length ? `<div class="delivery-grid">${orders.map(order => `<article class="delivery-card"><a class="delivery-card-main" href="#/deliveries/${encodeURIComponent(order.id)}"><div class="delivery-card-heading"><span class="point-avatar">${icon('truck')}</span>${deliveryStatus(order.status)}</div><h3>Рейс №${escape(order.id)}</h3><p>${escape(order.carPlate || 'Машина не указана')}</p><div class="delivery-card-footer"><span>${escape(deliveryDate(order.createdAt))}</span><span>Груз ${icon('arrow')}</span></div></a><div class="delivery-card-actions">${deliveryAssignment(order)}</div></article>`).join('')}</div>${view.hasMore ? `<div class="list-bottom"><button class="button full" data-action="delivery-load-more" ${view.loadingMore ? 'disabled' : ''}>${view.loadingMore ? 'Загружаем…' : 'Показать ещё 10'}</button></div>` : ''}` : empty('truck', 'Свободных рейсов пока нет', 'Рейс с назначенным ответственным можно открыть по номеру выше.')}`;
+  const mine = view.deliveryTab === 'mine';
+  const emptyState = mine
+    ? empty('truck', 'У вас пока нет рейсов', 'Выберите свободный рейс и возьмите его на себя.', '<button class="button primary" type="button" data-action="delivery-tab" data-tab="unassigned">Найти свободный рейс</button>')
+    : empty('truck', 'Свободных рейсов пока нет', 'Ваши назначенные рейсы доступны во вкладке «Мои рейсы».');
+  $('#delivery-list').innerHTML = `<div class="result-header"><h2>${mine ? 'Мои рейсы' : 'Рейсы без ответственного'}</h2><span class="count-badge">${orders.length}${view.hasMore ? '+' : ''}</span></div>${orders.length ? `<div class="delivery-grid">${orders.map(order => `<article class="delivery-card"><a class="delivery-card-main" href="#/deliveries/${encodeURIComponent(order.id)}${mine ? '?tab=mine' : ''}"><div class="delivery-card-heading"><span class="point-avatar">${icon('truck')}</span>${deliveryStatus(order.status)}</div><h3>Рейс №${escape(order.id)}</h3><p>${escape(order.carPlate || 'Машина не указана')}</p><div class="delivery-card-footer"><span>${escape(deliveryDate(order.createdAt))}</span><span>Груз ${icon('arrow')}</span></div></a><div class="delivery-card-actions">${mine ? `<span class="assignment-status mine">${icon('check')}Вы ответственный</span>` : deliveryAssignment(order)}</div></article>`).join('')}</div>${view.hasMore ? `<div class="list-bottom"><button class="button full" data-action="delivery-load-more" ${view.loadingMore ? 'disabled' : ''}>${view.loadingMore ? 'Загружаем…' : 'Показать ещё 10'}</button></div>` : ''}${mine && orders.length === 10 ? '<p class="result-caption">Показаны первые 10 ваших рейсов.</p>' : ''}` : emptyState}`;
 }
 async function loadDeliveries(signal, append = false) {
-  if (view.loadingMore) return;
+  if (view.loadingMore || (append && view.deliveryTab === 'mine')) return;
   const current = view;
   current.loadingMore = true;
   if (append) renderDeliveryCards();
   try {
-    const orders = await api(`/api/delivery-orders/unassigned?offset=${append ? current.offset : 0}`, signal);
+    const path = current.deliveryTab === 'mine' ? '/api/delivery-orders/mine' : `/api/delivery-orders/unassigned?offset=${append ? current.offset : 0}`;
+    const orders = await api(path, signal);
     if (signal.aborted) return;
     if (!Array.isArray(orders)) throw new ApiError(0);
     current.offset = (append ? current.offset : 0) + orders.length;
     current.orders = append ? [...current.orders, ...orders] : orders;
-    current.hasMore = orders.length === 10;
+    current.hasMore = current.deliveryTab !== 'mine' && orders.length === 10;
     current.loadingMore = false;
     renderDeliveryCards();
   } catch (error) {
@@ -325,9 +330,12 @@ async function loadDeliveries(signal, append = false) {
     } else $('#delivery-list').innerHTML = errorMarkup(error);
   }
 }
-function renderDeliveries(signal) {
-  view = { section: 'deliveries', orders: [], offset: 0, hasMore: false, loadingMore: false };
-  main.innerHTML = `${heading('Доставки', 'Откройте рейс и сравните план с фактической загрузкой.')}<div id="delivery-feedback" role="status"></div>${deliveryLookup()}<section class="panel" id="delivery-list" aria-live="polite">${loading('Загружаем рейсы')}</section>`;
+function renderDeliveries(params, signal) {
+  const tab = params.get('tab') === 'mine' ? 'mine' : 'unassigned';
+  savedDeliveryRoute = tab === 'mine' ? '#/deliveries?tab=mine' : '#/deliveries';
+  view = { section: 'deliveries', deliveryTab: tab, orders: [], offset: 0, hasMore: false, loadingMore: false };
+  const tabs = `<div class="delivery-tabs segmented" role="group" aria-label="Список рейсов">${[['unassigned', 'Свободные рейсы'], ['mine', 'Мои рейсы']].map(([key, label]) => `<button type="button" data-action="delivery-tab" data-tab="${key}" class="${key === tab ? 'active' : ''}" aria-pressed="${key === tab}">${label}</button>`).join('')}</div>`;
+  main.innerHTML = `${heading('Доставки', 'Откройте рейс и сравните план с фактической загрузкой.')}<div id="delivery-feedback" role="status"></div>${deliveryLookup()}${tabs}<section class="panel" id="delivery-list" aria-live="polite">${loading(tab === 'mine' ? 'Загружаем ваши рейсы' : 'Загружаем свободные рейсы')}</section>`;
   loadDeliveries(signal);
 }
 function cargoBadge(product) {
@@ -348,9 +356,10 @@ function renderCargoRows() {
   });
   $('#cargo-results').innerHTML = products.length ? `<div class="cargo-table-wrap"><table class="cargo-table"><caption class="sr-only">План и фактическая загрузка рейса. Количество в коробках.</caption><thead><tr><th scope="col">Товар</th><th scope="col" class="cargo-number">Нужно</th><th scope="col" class="cargo-number">В машине</th><th scope="col">Загрузка</th></tr></thead><tbody>${products.map(product => `<tr><th scope="row"><a href="#/products/${encodeURIComponent(product.productId)}">${escape(product.productName)}</a><small>ID ${escape(product.productId)}</small></th><td class="cargo-number">${number(product.requiredQuantity)}</td><td class="cargo-number ${cargoState(product) === 'shortage' ? 'cargo-shortage' : ''}">${number(product.inTruckQuantity)}</td><td>${cargoBadge(product)}</td></tr>`).join('')}</tbody></table></div>` : empty('search', view.cargo.length ? 'Нет подходящих товаров' : 'В рейсе пока нет груза', view.cargo.length ? 'Измените название или выберите другой фильтр.' : 'Здесь появятся товары и количество коробок по плану и в машине.');
 }
-async function renderDelivery(id, signal) {
+async function renderDelivery(id, params, signal) {
   view = { section: 'deliveries', deliveryId: id, cargo: [], cargoQuery: '', cargoFilter: 'all' };
-  const back = `<a class="back-link" href="#/deliveries">${icon('back')}К рейсам</a>`;
+  const backRoute = params.get('tab') === 'mine' ? '#/deliveries?tab=mine' : savedDeliveryRoute;
+  const back = `<a class="back-link" href="${escape(backRoute)}">${icon('back')}${backRoute.includes('tab=mine') ? 'К моим рейсам' : 'К рейсам'}</a>`;
   main.innerHTML = `${back}<section class="panel">${loading('Загружаем груз рейса')}</section>`;
   try {
     const data = await api(`/api/delivery-orders/${encodeURIComponent(id)}`, signal);
@@ -403,8 +412,8 @@ async function route() {
   else if (section === 'products') await renderProduct(id, url.searchParams, signal);
   else if (section === 'points' && !id) { savedPointRoute = location.hash || '#/points'; await renderPoints(url.searchParams, signal); }
   else if (section === 'points') await renderPoint(id, url.searchParams, signal);
-  else if (id) await renderDelivery(id, signal);
-  else renderDeliveries(signal);
+  else if (id) await renderDelivery(id, url.searchParams, signal);
+  else renderDeliveries(url.searchParams, signal);
 }
 function navigate(hash) { if (location.hash === hash) route(); else location.hash = hash; }
 function updateMode(mode, point = false) {
@@ -431,7 +440,7 @@ document.addEventListener('submit', event => {
   if (form.id === 'delivery-lookup') {
     const error = validate('id', query);
     showValidation(form, error ? 'Введите положительный номер рейса до 9223372036854775807.' : '');
-    if (!error) navigate(`#/deliveries/${query}`);
+    if (!error) navigate(`#/deliveries/${query}${view.deliveryTab === 'mine' ? '?tab=mine' : ''}`);
     return;
   }
   if (form.id === 'point-search') { view.pointQuery = query; updatePointFilters(); return; }
@@ -453,6 +462,7 @@ document.addEventListener('click', event => {
     auth.logout().catch(error => { $('#account-error').textContent = error.message; }).finally(() => { button.disabled = false; });
   }
   else if (action === 'delivery-load-more') loadDeliveries(navigation.signal, true);
+  else if (action === 'delivery-tab') navigate(button.dataset.tab === 'mine' ? '#/deliveries?tab=mine' : '#/deliveries');
   else if (action === 'assign-delivery') assignDelivery(button.dataset.deliveryId);
   else if (action === 'cargo-filter') { view.cargoFilter = button.dataset.filter; renderCargoRows(); }
   else if (action === 'search-mode') updateMode(button.dataset.mode);

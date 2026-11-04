@@ -1,4 +1,12 @@
 @charset "UTF-8";
+.delivery-tabs.segmented { display:inline-flex; margin:0 0 20px; padding:4px; }
+.delivery-tabs.segmented button { padding:11px 22px; white-space:nowrap; flex:0 0 auto; }
+.assignment-mine-link { margin-left:18px; }
+@media(max-width:600px) {
+  .delivery-tabs.segmented { display:flex; width:100%; }
+  .delivery-tabs.segmented button { flex:1; padding:11px 10px; }
+  .assignment-mine-link { margin-left:12px; }
+}
 .delivery-card-main { display:block; color:inherit; }
 .delivery-card-main:focus-visible { outline-offset:7px; border-radius:5px; }
 .delivery-card-actions { margin-top:16px; }

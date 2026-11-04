@@ -15,6 +15,15 @@ public enum AssignResponsibleResult
     AlreadyAssigned
 }
 
+public enum ChangeDeliveryStatusResult
+{
+    Updated,
+    OrderNotFound,
+    NotResponsible,
+    InvalidStatus,
+    InvalidTransition
+}
+
 public class DeliveryOrderService
 {
     private const int PageSize = 10;
@@ -140,5 +149,58 @@ public class DeliveryOrderService
             Order = order,
             Items = items
         };
+    }
+
+    public async Task<ChangeDeliveryStatusResult> ChangeStatusAsync(
+        long orderId,
+        string userId,
+        string status,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(orderId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        var previousStatus = status switch
+        {
+            "loading" => "new",
+            "unloading" => "loading",
+            "completed" => "unloading",
+            _ => null
+        };
+
+        if (previousStatus is null)
+            return ChangeDeliveryStatusResult.InvalidStatus;
+
+        var updated = await _db.DeliveryOrders
+            .Where(order =>
+                order.Id == orderId &&
+                order.ResponsibleUserId == userId &&
+                order.Status == previousStatus)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(order => order.Status, status),
+                cancellationToken);
+
+        if (updated > 0)
+            return ChangeDeliveryStatusResult.Updated;
+
+        var order = await _db.DeliveryOrders
+            .AsNoTracking()
+            .Where(order => order.Id == orderId)
+            .Select(order => new
+            {
+                order.ResponsibleUserId,
+                order.Status
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (order is null)
+            return ChangeDeliveryStatusResult.OrderNotFound;
+
+        if (order.ResponsibleUserId != userId)
+            return ChangeDeliveryStatusResult.NotResponsible;
+
+        return order.Status == status
+            ? ChangeDeliveryStatusResult.Updated
+            : ChangeDeliveryStatusResult.InvalidTransition;
     }
 }

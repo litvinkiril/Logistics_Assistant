@@ -109,4 +109,50 @@ public class DeliveryOrdersController : ControllerBase
         return Ok(result);
     }
 
+    [Authorize]
+    [HttpPatch("{id:long}/status")]
+    public async Task<IActionResult> ChangeStatusAsync(
+    long id,
+    [FromBody] ChangeDeliveryStatusRequest request,
+    CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+            return BadRequest("ID рейса должен быть положительным числом.");
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("user_id");
+
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized("Не удалось определить пользователя.");
+
+        var result = await _orders.ChangeStatusAsync(
+            id,
+            userId,
+            request.Status,
+            cancellationToken);
+
+        return result switch
+        {
+            ChangeDeliveryStatusResult.Updated =>
+                NoContent(),
+
+            ChangeDeliveryStatusResult.OrderNotFound =>
+                NotFound("Рейс не найден."),
+
+            ChangeDeliveryStatusResult.NotResponsible =>
+                StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    "Изменять статус может только ответственный за рейс."),
+
+            ChangeDeliveryStatusResult.InvalidStatus =>
+                BadRequest("Допустимые статусы: loading, unloading, completed."),
+
+            ChangeDeliveryStatusResult.InvalidTransition =>
+                Conflict("Статус рейса изменился или нарушен порядок переходов. Обновите данные."),
+
+            _ => throw new InvalidOperationException(
+                "Неизвестный результат изменения статуса.")
+        };
+    }
+
 }
