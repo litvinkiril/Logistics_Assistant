@@ -38,3 +38,20 @@ export function cargoState(product) {
   if (product.inTruckQuantity < product.requiredQuantity) return 'shortage';
   return 'complete';
 }
+
+// Send Int64 IDs as decimal strings: ASP.NET Core accepts them without JS rounding.
+export function loadBoxRequest(itemId, mode, value) {
+  const positiveId = value => /^[1-9]\d{0,18}$/.test(String(value)) && BigInt(value) <= 9223372036854775807n;
+  if (!positiveId(itemId)) throw new Error('Выберите позицию плана.');
+  const query = value.trim();
+  if (mode === 'id') {
+    if (!positiveId(query)) throw new Error('Введите положительный ID коробки до 9223372036854775807.');
+    return { orderItemId: String(itemId), physicalBoxId: query };
+  }
+  if (mode !== 'url' || !query) throw new Error('Вставьте ссылку с этикетки коробки.');
+  return { orderItemId: String(itemId), url: query };
+}
+
+export function nextDeliveryStatus(status) {
+  return { new: 'loading', loading: 'unloading', unloading: 'completed' }[status] ?? null;
+}

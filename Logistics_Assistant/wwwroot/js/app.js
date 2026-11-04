@@ -1,4 +1,4 @@
-import { deliveryProducts, cargoState } from './delivery-data.js';
+import { deliveryProducts, cargoState, loadBoxRequest, nextDeliveryStatus } from './delivery-data.js';
 import { createAuth } from './auth.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -7,6 +7,7 @@ const historyKey = 'logistics-assistant:searches:v1';
 const modes = { name: { label: 'Название', placeholder: 'Например, стеллаж', hint: 'Найдём все совпадения по части названия.', icon: 'search' }, id: { label: 'ID', placeholder: 'Введите ID товара', hint: 'Укажите положительный числовой ID товара.', icon: 'hash' }, url: { label: 'URL', placeholder: 'https://…', hint: 'Вставьте полную ссылку на страницу товара.', icon: 'link' } };
 let navigation, view = {};
 const assigningDeliveries = new Set();
+const changingDeliveries = new Set();
 let savedSearchRoute = '#/products', savedPointRoute = '#/points', savedDeliveryRoute = '#/deliveries';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const icon = name => `<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#${name}"/></svg>`;
@@ -224,12 +225,12 @@ async function renderPoint(id, params, signal) {
     const lat = Number(p.latitude), lon = Number(p.longitude);
     const hasCoordinates = p.latitude != null && p.longitude != null && Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
     const mapUrl = `https://yandex.ru/maps/?${new URLSearchParams({ ll: `${lon},${lat}`, z: '16', pt: `${lon},${lat},pm2blm` })}`;
-    main.innerHTML = `${back}<div class="detail-layout"><article class="panel detail-panel"><div class="detail-title-row">${pointAvatar(p)}<div><h1>${escape(p.name)}</h1>${typeBadge(p)}${activeBadge(p)}</div></div><div class="address-block"><div class="address-label">${icon('pin')}АДРЕС ТОЧКИ</div><p>${escape([p.city, p.address].filter(Boolean).join(', ') || 'Адрес не указан')}</p></div>${hasCoordinates ? `<a href="${escape(mapUrl)}" target="_blank" rel="noopener noreferrer" class="map-card" aria-label="Открыть расположение точки в Яндекс Картах"><span class="map-pin">${icon('pin')}</span><span class="map-open">Расположение на карте ${icon('external')}</span></a><div class="coordinates">${icon('pin')}${lat.toFixed(6)}, ${lon.toFixed(6)}<span>· Схема условная</span></div>` : ''}<section class="warehouse-search" aria-labelledby="availability-title"><h2 id="availability-title">Проверить наличие товара</h2><p>Найдите нужный товар — покажем его остаток в этой точке.</p>${pointSearchForm(view.mode, view.query)}<div class="point-products" id="point-products" aria-live="polite">${notice('Введите название, ID или ссылку на товар для проверки наличия.')}</div></section></article><aside class="detail-aside"><section class="panel aside-card"><h2>${icon(pointIcon(p))}Информация о точке</h2><dl class="facts"><div><dt>ID точки</dt><dd>${escape(p.id)}</dd></div><div><dt>Тип</dt><dd>${escape(pointType(p))}</dd></div><div><dt>Город</dt><dd>${escape(p.city || 'Не указан')}</dd></div><div><dt>Статус</dt><dd>${p.isActive ? 'Активен' : 'Неактивен'}</dd></div></dl>${hasCoordinates ? `<a href="${escape(mapUrl)}" class="button full" style="margin-top:14px" target="_blank" rel="noopener noreferrer">${icon('pin')}Открыть на карте ${icon('external')}</a>` : ''}</section><section class="panel aside-card"><h2>${icon('info')}Наличие в выбранной точке</h2><p>Поиск проверяет остатки конкретных товаров. Полный перечень товаров склада пока недоступен в приложении.</p><a class="button quiet" href="#/products">Перейти к поиску товаров ${icon('arrow')}</a></section></aside></div>`;
+    main.innerHTML = `${back}<div class="detail-layout"><article class="panel detail-panel"><div class="detail-title-row">${pointAvatar(p)}<div><h1>${escape(p.name)}</h1>${typeBadge(p)}${activeBadge(p)}</div></div><div class="address-block"><div class="address-label">${icon('warehouse')}АДРЕС ТОЧКИ</div><p>${escape([p.city, p.address].filter(Boolean).join(', ') || 'Адрес не указан')}</p></div>${hasCoordinates ? `<a href="${escape(mapUrl)}" target="_blank" rel="noopener noreferrer" class="map-card" aria-label="Открыть расположение точки в Яндекс Картах"><span class="map-pin">${icon('warehouse')}</span><span class="map-open">Расположение на карте ${icon('external')}</span></a><div class="coordinates">${icon('warehouse')}${lat.toFixed(6)}, ${lon.toFixed(6)}<span>· Схема условная</span></div>` : ''}<section class="warehouse-search" aria-labelledby="availability-title"><h2 id="availability-title">Проверить наличие товара</h2><p>Найдите нужный товар — покажем его остаток в этой точке.</p>${pointSearchForm(view.mode, view.query)}<div class="point-products" id="point-products" aria-live="polite">${notice('Введите название, ID или ссылку на товар для проверки наличия.')}</div></section></article><aside class="detail-aside"><section class="panel aside-card"><h2>${icon(pointIcon(p))}Информация о точке</h2><dl class="facts"><div><dt>ID точки</dt><dd>${escape(p.id)}</dd></div><div><dt>Тип</dt><dd>${escape(pointType(p))}</dd></div><div><dt>Город</dt><dd>${escape(p.city || 'Не указан')}</dd></div><div><dt>Статус</dt><dd>${p.isActive ? 'Активен' : 'Неактивен'}</dd></div></dl>${hasCoordinates ? `<a href="${escape(mapUrl)}" class="button full" style="margin-top:14px" target="_blank" rel="noopener noreferrer">${icon('warehouse')}Открыть на карте ${icon('external')}</a>` : ''}</section><section class="panel aside-card"><h2>${icon('info')}Наличие в выбранной точке</h2><p>Поиск проверяет остатки конкретных товаров. Полный перечень товаров склада пока недоступен в приложении.</p><a class="button quiet" href="#/products">Перейти к поиску товаров ${icon('arrow')}</a></section></aside></div>`;
     if (view.query) loadPointProducts(signal);
   } catch (error) { if (!signal.aborted) main.innerHTML = `${back}<section class="panel">${errorMarkup(error)}</section>`; }
 }
 function deliveryStatus(status) {
-  const labels = { new: 'Новый', planned: 'Запланирован', assigned: 'Назначен', loading: 'Погрузка', in_transit: 'В пути', completed: 'Завершён', delivered: 'Доставлен', cancelled: 'Отменён' };
+  const labels = { new: 'Новый', planned: 'Запланирован', assigned: 'Назначен', loading: 'Погрузка', unloading: 'Разгрузка', in_transit: 'В пути', completed: 'Завершён', delivered: 'Доставлен', cancelled: 'Отменён' };
   return `<span class="badge">${escape(labels[status] || 'Статус не указан')}</span>`;
 }
 function deliveryDate(value) {
@@ -238,7 +239,7 @@ function deliveryDate(value) {
 }
 function deliveryOverview(order) {
   if (!order) return '';
-  return `<section class="panel delivery-overview"><div id="delivery-feedback" role="status"></div><div class="delivery-vehicle"><span class="point-avatar">${icon('truck')}</span><div><strong>${escape(order.carPlate || 'Машина не указана')}</strong><small>Создан ${escape(deliveryDate(order.createdAt))}</small></div>${deliveryStatus(order.status)}</div>${order.contactPhone ? `<p class="delivery-contact">Контакт: ${escape(order.contactPhone)}</p>` : ''}<div id="delivery-assignment" class="delivery-assignment">${deliveryAssignment(order)}</div></section>`;
+  return `<section class="panel delivery-overview"><div id="delivery-feedback" role="status"></div><div class="delivery-vehicle"><span class="point-avatar">${icon('truck')}</span><div><strong>${escape(order.carPlate || 'Машина не указана')}</strong><small>Создан ${escape(deliveryDate(order.createdAt))}</small></div>${deliveryStatus(order.status)}</div>${order.contactPhone ? `<p class="delivery-contact">Контакт: ${escape(order.contactPhone)}</p>` : ''}${order.sourcePointId ? `<p class="delivery-contact">Отправление: <a href="#/points/${encodeURIComponent(order.sourcePointId)}">Склад №${escape(order.sourcePointId)}</a></p>` : ''}${order.cargoLengthCm && order.cargoWidthCm && order.cargoHeightCm ? `<p class="delivery-contact">Кузов: ${number(order.cargoLengthCm)} × ${number(order.cargoWidthCm)} × ${number(order.cargoHeightCm)} см${order.maxLoadKg ? ` · до ${number(order.maxLoadKg)} кг` : ''}</p>` : ''}<div id="delivery-assignment" class="delivery-assignment">${deliveryAssignment(order)}</div></section>`;
 }
 function deliveryAssignment(order) {
   if (order.responsibleUserId) {
@@ -270,6 +271,7 @@ async function assignDelivery(id) {
     if (current.deliveryId && current.order) {
       current.order.responsibleUserId = auth.user.id;
       $('#delivery-assignment').innerHTML = deliveryAssignment(current.order);
+      renderDeliveryOperations();
       deliveryFeedback('Рейс назначен на вас.');
     } else navigate(`#/deliveries/${id}`);
   } catch (error) {
@@ -282,7 +284,7 @@ async function assignDelivery(id) {
           const data = await api(`/api/delivery-orders/${encodeURIComponent(id)}`, signal);
           if (view !== current || signal.aborted) return;
           current.order = data.order;
-          if (current.order) $('#delivery-assignment').innerHTML = deliveryAssignment(current.order);
+          if (current.order) { $('#delivery-assignment').innerHTML = deliveryAssignment(current.order); renderDeliveryOperations(); }
         } catch { /* Keep the server's assignment error if refreshing fails. */ }
       } else { route(); return; }
       if (view !== current || signal.aborted) return;
@@ -295,6 +297,97 @@ async function assignDelivery(id) {
     });
   }
 }
+function renderDeliveryOperations() {
+  const host = $('#delivery-operations');
+  if (!host || !view.order) return;
+  const order = view.order;
+  const mine = String(order.responsibleUserId) === String(auth.user?.id);
+  const next = nextDeliveryStatus(order.status);
+  const labels = { loading: 'Начать погрузку', unloading: 'Перейти к разгрузке', completed: 'Завершить рейс' };
+  const steps = [['new', 'Новый'], ['loading', 'Погрузка'], ['unloading', 'Разгрузка'], ['completed', 'Завершён']];
+  const stage = steps.findIndex(([status]) => status === order.status);
+  host.innerHTML = `<section class="panel workflow-panel" aria-labelledby="workflow-title"><h2 id="workflow-title">Работа с рейсом</h2>
+    <ol class="delivery-steps">${steps.map(([status, label], index) => `<li class="${index < stage ? 'done' : ''} ${index === stage ? 'current' : ''}" ${status === order.status ? 'aria-current="step"' : ''}><span>${index < stage ? '✓' : index + 1}</span>${label}</li>`).join('')}</ol>
+    ${mine && next ? `<form id="delivery-status-form"><p class="workflow-hint">${order.status === 'new' ? 'Начните погрузку, затем добавляйте коробки по этикетке.' : order.status === 'loading' ? 'Перед переходом к разгрузке проверьте план и фактическую загрузку. После перехода добавить коробки нельзя.' : 'Завершение закрывает рейс. Учёт выгрузки коробок в точке назначения пока недоступен; коробки сохранят отметку «В пути».'}</p>${order.status !== 'new' ? `<label class="workflow-confirm"><input name="confirmed" type="checkbox" required> ${order.status === 'loading' ? 'Загрузка проверена, готов перейти к разгрузке' : 'Подтверждаю завершение рейса'}</label>` : ''}<button class="button primary" type="submit">${icon('check')}${labels[next]}</button></form>` : `<p class="workflow-hint">${order.status === 'completed' ? 'Рейс завершён.' : mine ? 'Для текущего статуса нет доступных действий.' : order.responsibleUserId ? 'Изменять этап и загружать коробки может ответственный за рейс.' : 'Возьмите рейс на себя, чтобы начать работу.'}</p>`}
+    ${mine && order.status === 'loading' ? (order.sourcePointId && view.items.length ? `<form id="box-load-form" class="box-load-form"><h3>Погрузить коробку</h3><label class="field-label" for="load-item">Позиция и пункт назначения</label><select id="load-item" name="itemId" required>${view.items.map(item => `<option value="${escape(item.itemId)}">${escape(item.productName)} · ${escape(item.boxName)} → ${escape(item.destination?.name || 'Точка не указана')} · ${number(item.inTruckBoxQuantity)} / ${number(item.boxQuantity)}</option>`).join('')}</select><div class="load-fields"><div><label class="field-label" for="load-mode">Идентификатор</label><select id="load-mode" name="mode"><option value="id">ID коробки</option><option value="url">Ссылка с этикетки</option></select></div><div><label class="field-label" for="load-value">Коробка</label><input id="load-value" name="boxValue" placeholder="Введите ID или вставьте ссылку" autocomplete="off" required aria-describedby="load-hint"></div><button class="button primary" type="submit">${icon('box')}Погрузить</button></div><p class="workflow-hint" id="load-hint">Выберите упаковку и пункт назначения. Счётчики обновятся после погрузки. Повторное сканирование той же коробки не добавляет её второй раз.</p></form>` : '<p class="workflow-hint">Для погрузки нужны склад отправления и позиции плана. Они пока не указаны.</p>') : ''}
+    <div id="operation-feedback" role="status"></div></section>`;
+  if (changingDeliveries.has(String(order.id)) || view.requiresRefresh) setDeliveryBusy(true);
+}
+function setDeliveryBusy(busy) {
+  $('#delivery-operations')?.querySelectorAll('button, input, select').forEach(control => { control.disabled = busy; });
+  $('#delivery-operations')?.setAttribute('aria-busy', String(busy));
+}
+function operationFeedback(message, error = false) {
+  const element = $('#operation-feedback');
+  if (!element) return;
+  element.className = `delivery-feedback ${error ? 'is-error' : ''}`;
+  element.setAttribute('role', error ? 'alert' : 'status');
+  element.textContent = message;
+}
+async function performDeliveryOperation(form) {
+  const current = view, id = String(current.order?.id), signal = navigation.signal;
+  if (!current.order || changingDeliveries.has(id)) return;
+  let path, method, payload, message;
+  const selection = form.id === 'box-load-form' ? { item: form.elements.itemId.value, mode: form.elements.mode.value } : null;
+  try {
+    if (selection) {
+      payload = loadBoxRequest(selection.item, selection.mode, form.elements.boxValue.value);
+      path = `/api/delivery-orders/${id}/boxes/load`; method = 'POST';
+      message = 'Коробка учтена в рейсе. Можно сканировать следующую.';
+    } else {
+      const status = nextDeliveryStatus(current.order.status);
+      if (!status || (status !== 'loading' && !form.elements.confirmed?.checked)) return;
+      payload = { status }; path = `/api/delivery-orders/${id}/status`; method = 'PATCH';
+      message = 'Этап рейса обновлён.';
+    }
+  } catch (error) { operationFeedback(error.message, true); return; }
+  changingDeliveries.add(id); setDeliveryBusy(true); operationFeedback('Сохраняем…');
+  let saved = false;
+  try {
+    await auth.mutate(path, method, payload);
+    saved = true;
+    if (view !== current || signal.aborted) return;
+    await refreshDeliveryDetails(current, signal);
+    if (view !== current || signal.aborted) return;
+    operationFeedback(message);
+    const newForm = $('#box-load-form');
+    if (selection && newForm) {
+      newForm.elements.itemId.value = selection.item;
+      newForm.elements.mode.value = selection.mode;
+      newForm.elements.boxValue.value = '';
+    }
+  } catch (error) {
+    if (view !== current || signal.aborted || error.status === 401) return;
+    if (!saved && [403, 409].includes(error.status)) {
+      try { await refreshDeliveryDetails(current, signal); } catch { /* Keep the original action error. */ }
+    }
+    if (saved) current.requiresRefresh = true;
+    if (view === current && !signal.aborted) operationFeedback(saved ? 'Изменение сохранено, но обновить данные не удалось. Нажмите «Обновить» перед следующим действием.' : error.status ? error.message : 'Не удалось подтвердить результат. Обновите данные перед повторной попыткой.', true);
+  } finally {
+    changingDeliveries.delete(id);
+    if (String(view.order?.id) === id && !navigation.signal.aborted) setDeliveryBusy(Boolean(view.requiresRefresh));
+    if (view === current && !signal.aborted && selection && !current.requiresRefresh) $('#load-value')?.focus();
+  }
+}
+function renderDeliveryPlan() {
+  const host = $('#delivery-plan');
+  if (!host) return;
+  host.innerHTML = `<section class="panel plan-panel"><div class="result-header"><div><h2>План по упаковкам</h2><p class="cargo-unit">Отдельно для каждого пункта назначения</p></div><span class="count-badge">${view.items.length}</span></div>${view.items.length ? `<div class="plan-list">${view.items.map(item => `<article class="plan-item"><div><h3>${escape(item.productName)}</h3><p>${escape(item.boxName)} · Позиция №${escape(item.itemId)}</p><a href="#/points/${encodeURIComponent(item.destination.id)}">${icon('warehouse')}${escape(item.destination.name)}</a><small>${escape([item.destination.city, item.destination.address].filter(Boolean).join(', '))}</small></div><div class="plan-count"><strong>${number(item.inTruckBoxQuantity)} / ${number(item.boxQuantity)}</strong><small>в машине / план</small></div></article>`).join('')}</div>` : '<p class="inline-empty">Позиции плана пока не добавлены.</p>'}</section>`;
+}
+async function refreshDeliveryDetails(current, signal) {
+  const data = await api(`/api/delivery-orders/${current.deliveryId}`, signal);
+  if (view !== current || signal.aborted) return;
+  current.cargo = deliveryProducts(data);
+  current.requiresRefresh = false;
+  current.order = data.order;
+  current.items = data.items;
+  $('#delivery-overview').innerHTML = deliveryOverview(current.order);
+  updateCargoTotals(); renderCargoRows(); renderDeliveryPlan(); renderDeliveryOperations();
+}
+function updateCargoTotals() {
+  const totals = view.cargo.reduce((sum, product) => ({ required: sum.required + product.requiredQuantity, inTruck: sum.inTruck + product.inTruckQuantity, shortage: sum.shortage + Math.max(0, product.requiredQuantity - product.inTruckQuantity) }), { required: 0, inTruck: 0, shortage: 0 });
+  ['required', 'inTruck', 'shortage'].forEach((key, index) => { const counter = document.querySelectorAll('.cargo-summary strong')[index]; if (counter) counter.textContent = number(totals[key]); });
+}
 function deliveryLookup() {
   return `<section class="panel delivery-lookup"><div><h2>Открыть рейс</h2><p>Введите номер, чтобы проверить план и груз в машине.</p></div><form id="delivery-lookup" novalidate><label class="sr-only" for="delivery-id">Номер рейса</label><div class="delivery-lookup-fields"><div class="search-input">${icon('hash')}<input id="delivery-id" name="query" inputmode="numeric" placeholder="Номер рейса" maxlength="19" aria-describedby="search-error" autocomplete="off"></div><button class="button primary" type="submit">Открыть ${icon('arrow')}</button></div><p class="field-error" id="search-error" role="alert"></p></form></section>`;
 }
@@ -304,21 +397,21 @@ function renderDeliveryCards() {
   const emptyState = mine
     ? empty('truck', 'У вас пока нет рейсов', 'Выберите свободный рейс и возьмите его на себя.', '<button class="button primary" type="button" data-action="delivery-tab" data-tab="unassigned">Найти свободный рейс</button>')
     : empty('truck', 'Свободных рейсов пока нет', 'Ваши назначенные рейсы доступны во вкладке «Мои рейсы».');
-  $('#delivery-list').innerHTML = `<div class="result-header"><h2>${mine ? 'Мои рейсы' : 'Рейсы без ответственного'}</h2><span class="count-badge">${orders.length}${view.hasMore ? '+' : ''}</span></div>${orders.length ? `<div class="delivery-grid">${orders.map(order => `<article class="delivery-card"><a class="delivery-card-main" href="#/deliveries/${encodeURIComponent(order.id)}${mine ? '?tab=mine' : ''}"><div class="delivery-card-heading"><span class="point-avatar">${icon('truck')}</span>${deliveryStatus(order.status)}</div><h3>Рейс №${escape(order.id)}</h3><p>${escape(order.carPlate || 'Машина не указана')}</p><div class="delivery-card-footer"><span>${escape(deliveryDate(order.createdAt))}</span><span>Груз ${icon('arrow')}</span></div></a><div class="delivery-card-actions">${mine ? `<span class="assignment-status mine">${icon('check')}Вы ответственный</span>` : deliveryAssignment(order)}</div></article>`).join('')}</div>${view.hasMore ? `<div class="list-bottom"><button class="button full" data-action="delivery-load-more" ${view.loadingMore ? 'disabled' : ''}>${view.loadingMore ? 'Загружаем…' : 'Показать ещё 10'}</button></div>` : ''}${mine && orders.length === 10 ? '<p class="result-caption">Показаны первые 10 ваших рейсов.</p>' : ''}` : emptyState}`;
+  $('#delivery-list').innerHTML = `<div class="result-header"><h2>${mine ? 'Мои рейсы' : 'Рейсы без ответственного'}</h2><span class="count-badge">${orders.length}${view.hasMore ? '+' : ''}</span></div>${orders.length ? `<div class="delivery-grid">${orders.map(order => `<article class="delivery-card"><a class="delivery-card-main" href="#/deliveries/${encodeURIComponent(order.id)}${mine ? '?tab=mine' : ''}"><div class="delivery-card-heading"><span class="point-avatar">${icon('truck')}</span>${deliveryStatus(order.status)}</div><h3>Рейс №${escape(order.id)}</h3><p>${escape(order.carPlate || 'Машина не указана')}</p><div class="delivery-card-footer"><span>${escape(deliveryDate(order.createdAt))}</span><span>Груз ${icon('arrow')}</span></div></a><div class="delivery-card-actions">${mine ? `<span class="assignment-status mine">${icon('check')}Вы ответственный</span>` : deliveryAssignment(order)}</div></article>`).join('')}</div>${view.hasMore ? `<div class="list-bottom"><button class="button full" data-action="delivery-load-more" ${view.loadingMore ? 'disabled' : ''}>${view.loadingMore ? 'Загружаем…' : 'Показать ещё 10'}</button></div>` : ''}` : emptyState}`;
 }
 async function loadDeliveries(signal, append = false) {
-  if (view.loadingMore || (append && view.deliveryTab === 'mine')) return;
+  if (view.loadingMore) return;
   const current = view;
   current.loadingMore = true;
   if (append) renderDeliveryCards();
   try {
-    const path = current.deliveryTab === 'mine' ? '/api/delivery-orders/mine' : `/api/delivery-orders/unassigned?offset=${append ? current.offset : 0}`;
+    const path = current.deliveryTab === 'mine' ? `/api/delivery-orders/mine?offset=${append ? current.offset : 0}` : `/api/delivery-orders/unassigned?offset=${append ? current.offset : 0}`;
     const orders = await api(path, signal);
     if (signal.aborted) return;
     if (!Array.isArray(orders)) throw new ApiError(0);
     current.offset = (append ? current.offset : 0) + orders.length;
     current.orders = append ? [...current.orders, ...orders] : orders;
-    current.hasMore = current.deliveryTab !== 'mine' && orders.length === 10;
+    current.hasMore = orders.length === 10;
     current.loadingMore = false;
     renderDeliveryCards();
   } catch (error) {
@@ -367,6 +460,7 @@ async function renderDelivery(id, params, signal) {
     if (!Array.isArray(data) && (!data?.order || !Array.isArray(data.items))) throw new ApiError(0);
     const order = Array.isArray(data) ? null : data.order;
     view.order = order;
+    view.items = Array.isArray(data) ? [] : data.items;
     view.cargo = deliveryProducts(data);
     const totals = view.cargo.reduce((sum, product) => ({
       required: sum.required + product.requiredQuantity,
@@ -375,8 +469,8 @@ async function renderDelivery(id, params, signal) {
     }), { required: 0, inTruck: 0, shortage: 0 });
     $('#breadcrumb').textContent = `Рейс №${id}`;
     document.title = `Рейс №${id} — Логистический помощник`;
-    main.innerHTML = `${back}${heading(`Рейс №${escape(id)}`, 'План перевозки и фактический груз в машине.')}${deliveryOverview(order)}<div class="summary-row cargo-summary"><div class="panel summary-item">${icon('box')}<div><strong>${number(totals.required)}</strong><small>Нужно коробок</small></div></div><div class="panel summary-item">${icon('truck')}<div><strong>${number(totals.inTruck)}</strong><small>Коробок в машине</small></div></div><div class="panel summary-item">${icon('layers')}<div><strong>${number(totals.shortage)}</strong><small>Осталось загрузить</small></div></div></div><section class="panel cargo-panel" aria-labelledby="cargo-title"><div class="result-header"><div><h2 id="cargo-title">Товары рейса</h2><p class="cargo-unit">Количество в коробках · все упаковки товара вместе</p></div><span class="count-badge" id="cargo-count"></span></div><div class="cargo-toolbar"><div class="search-input">${icon('search')}<input id="cargo-query" type="search" placeholder="Название или ID товара" aria-label="Поиск по грузу" maxlength="256"></div><div class="segmented" role="group" aria-label="Фильтр груза">${[['all', 'Все'], ['shortage', 'Не хватает'], ['unplanned', 'Вне плана'], ['differences', 'Расхождения']].map(([filter, label]) => `<button type="button" data-action="cargo-filter" data-filter="${filter}" aria-pressed="false">${label}</button>`).join('')}</div></div><div id="cargo-results" aria-live="polite"></div></section>`;
-    renderCargoRows();
+    main.innerHTML = `${back}${heading(`Рейс №${escape(id)}`, 'План перевозки и фактический груз в машине.')}<div id="delivery-overview">${deliveryOverview(order)}</div><div id="delivery-operations"></div><div class="summary-row cargo-summary"><div class="panel summary-item">${icon('box')}<div><strong>${number(totals.required)}</strong><small>Нужно коробок</small></div></div><div class="panel summary-item">${icon('truck')}<div><strong>${number(totals.inTruck)}</strong><small>Коробок в машине</small></div></div><div class="panel summary-item">${icon('layers')}<div><strong>${number(totals.shortage)}</strong><small>Осталось загрузить</small></div></div></div><section class="panel cargo-panel" aria-labelledby="cargo-title"><div class="result-header"><div><h2 id="cargo-title">Товары рейса</h2><p class="cargo-unit">Количество в коробках · все упаковки товара вместе</p></div><span class="count-badge" id="cargo-count"></span></div><div class="cargo-toolbar"><div class="search-input">${icon('search')}<input id="cargo-query" type="search" placeholder="Название или ID товара" aria-label="Поиск по грузу" maxlength="256"></div><div class="segmented" role="group" aria-label="Фильтр груза">${[['all', 'Все'], ['shortage', 'Не хватает'], ['unplanned', 'Вне плана'], ['differences', 'Расхождения']].map(([filter, label]) => `<button type="button" data-action="cargo-filter" data-filter="${filter}" aria-pressed="false">${label}</button>`).join('')}</div></div><div id="cargo-results" aria-live="polite"></div></section><div id="delivery-plan"></div>`;
+    renderCargoRows(); renderDeliveryPlan(); renderDeliveryOperations();
   } catch (error) {
     if (!signal.aborted) main.innerHTML = `${back}<section class="panel">${errorMarkup(error instanceof ApiError ? error : new ApiError(0))}</section>`;
   }
@@ -433,6 +527,7 @@ function updatePointFilters() {
 }
 document.addEventListener('submit', event => {
   const form = event.target;
+  if (['box-load-form', 'delivery-status-form'].includes(form.id)) { event.preventDefault(); performDeliveryOperation(form); return; }
   if (form.id === 'auth-form') { event.preventDefault(); auth.submit(form); return; }
   if (!['product-search', 'point-search', 'point-product-search', 'delivery-lookup'].includes(form.id)) return;
   event.preventDefault();

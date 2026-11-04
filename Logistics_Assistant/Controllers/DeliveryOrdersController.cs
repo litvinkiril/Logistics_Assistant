@@ -37,8 +37,12 @@ public class DeliveryOrdersController : ControllerBase
     [Authorize]
     [HttpGet("mine")]
     public async Task<ActionResult<List<DeliveryOrder>>> GetMineAsync(
+    [FromQuery] int offset = 0,
     CancellationToken cancellationToken = default)
     {
+        if (offset < 0)
+            return BadRequest("Смещение должно быть неотрицательным числом.");
+
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? User.FindFirstValue("user_id");
 
@@ -47,6 +51,7 @@ public class DeliveryOrdersController : ControllerBase
 
         var orders = await _orders.GetByUserIdAsync(
             userId,
+            offset,
             cancellationToken);
 
         return Ok(orders);

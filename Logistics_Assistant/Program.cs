@@ -2,6 +2,7 @@ using Logistics_Assistant.Configuration;
 using Logistics_Assistant.Services.DeliveryOrders;
 using Logistics_Assistant.Services.LogisticsPoints;
 using Logistics_Assistant.Services.Products;
+using Logistics_Assistant.Services.BoxMovements;
 
 
 
@@ -26,6 +27,7 @@ namespace Logistics_Assistant
                 builder.Services.AddScoped<ProductSearchService>();
                 builder.Services.AddScoped<LogisticsPointService>();
                 builder.Services.AddScoped<DeliveryOrderService>();
+                builder.Services.AddScoped<BoxMovementService>();
                 builder.Services.AddControllersWithViews();
                 builder.Services.AddProblemDetails();
 

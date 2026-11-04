@@ -1,6 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deliveryProducts, cargoState } from '../Logistics_Assistant/wwwroot/js/delivery-data.js';
+import { deliveryProducts, cargoState, loadBoxRequest, nextDeliveryStatus } from '../Logistics_Assistant/wwwroot/js/delivery-data.js';
+
+test('loading preserves Int64 IDs and sends exactly one box selector', () => {
+  assert.deepEqual(loadBoxRequest('9223372036854775806', 'id', ' 9223372036854775807 '), {
+    orderItemId: '9223372036854775806', physicalBoxId: '9223372036854775807'
+  });
+  assert.deepEqual(loadBoxRequest('15', 'url', ' https://example.test/box/42 '), {
+    orderItemId: '15', url: 'https://example.test/box/42'
+  });
+  for (const value of ['', '0', '-1', '1.5', '1e3', '9223372036854775808']) {
+    assert.throws(() => loadBoxRequest('15', 'id', value));
+  }
+  assert.throws(() => loadBoxRequest('', 'id', '1'));
+  assert.throws(() => loadBoxRequest('15', 'url', '  '));
+});
+
+test('workflow exposes only the next supported stage', () => {
+  assert.equal(nextDeliveryStatus('new'), 'loading');
+  assert.equal(nextDeliveryStatus('loading'), 'unloading');
+  assert.equal(nextDeliveryStatus('unloading'), 'completed');
+  assert.equal(nextDeliveryStatus('completed'), null);
+  assert.equal(nextDeliveryStatus('cancelled'), null);
+});
 
 test('combines packaging and destinations into one product without losing quantities', () => {
   assert.deepEqual(deliveryProducts({ items: [

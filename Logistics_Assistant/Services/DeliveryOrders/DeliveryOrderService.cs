@@ -55,14 +55,17 @@ public class DeliveryOrderService
 
     public Task<List<DeliveryOrder>> GetByUserIdAsync(
         string userId,
+        int offset = 0,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
 
         return _db.DeliveryOrders
             .AsNoTracking()
             .Where(order => order.ResponsibleUserId == userId)
             .OrderBy(order => order.Id)
+            .Skip(offset)
             .Take(PageSize)
             .ToListAsync(cancellationToken);
     }
