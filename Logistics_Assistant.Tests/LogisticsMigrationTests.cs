@@ -10,9 +10,10 @@ using Microsoft.AspNetCore.Identity;
 
 namespace Logistics_Assistant.Tests;
 
-public sealed class LogisticsMigrationTests
+public sealed partial class LogisticsMigrationTests
 {
     private const string Previous = "20261028113952_AddDeliveryOrderBoxes";
+    private const string Responsible = "20261103212709_AddDeliveryOrderResponsibleUser";
     private static readonly ServiceProvider ApplicationServices = CreateApplicationServices();
 
     [Fact]
@@ -30,7 +31,7 @@ public sealed class LogisticsMigrationTests
         await using var db = CreateContext(database.ConnectionString);
         await db.GetService<IMigrator>().MigrateAsync(previous);
         await db.Database.ExecuteSqlRawAsync(LegacySeed);
-        await db.Database.MigrateAsync();
+        await db.GetService<IMigrator>().MigrateAsync(Responsible);
 
         var existing = await db.DeliveryOrders.SingleAsync();
         Assert.Equal("test-user", existing.UserId);
@@ -58,7 +59,7 @@ public sealed class LogisticsMigrationTests
         await db.Database.ExecuteSqlRawAsync("DELETE FROM \"AspNetUsers\" WHERE \"Id\"='responsible-user'");
 
         await db.GetService<IMigrator>().MigrateAsync(previous);
-        await db.Database.MigrateAsync();
+        await db.GetService<IMigrator>().MigrateAsync(Responsible);
         Assert.Equal(2, await db.DeliveryOrders.CountAsync());
         Assert.All(await db.DeliveryOrders.AsNoTracking().ToListAsync(), order =>
         {
@@ -74,13 +75,12 @@ public sealed class LogisticsMigrationTests
         await using var db = CreateContext(database.ConnectionString);
         await db.GetService<IMigrator>().MigrateAsync(Previous);
         await db.Database.ExecuteSqlRawAsync(LegacySeed);
-        await db.Database.MigrateAsync();
+        await db.GetService<IMigrator>().MigrateAsync(Responsible);
 
-        var legacyBox = await db.PhysicalBoxes.AsNoTracking().SingleAsync();
-        Assert.Equal(1, legacyBox.ProductId);
-        Assert.Null(legacyBox.ProductUnitId);
-        Assert.Null(legacyBox.CurrentPointId);
-        Assert.Null(legacyBox.CurrentOrderId);
+        // Historical migrations are tested with SQL because the current CLR model has changed.
+        Assert.Equal(1L, await Scalar(database.ConnectionString, "SELECT product_id FROM physical_boxes WHERE id=1"));
+        Assert.Equal(1L, await Scalar(database.ConnectionString, "SELECT count(*) FROM physical_boxes WHERE product_unit_id IS NULL AND current_order_id IS NULL"));
+        Assert.Equal(1L, await Scalar(database.ConnectionString, "SELECT count(*) FROM physical_boxes WHERE current_point_id IS NULL"));
         Assert.Equal(7, (await db.WarehouseProducts.SingleAsync()).Quantity);
         Assert.Equal(1, (await db.DeliveryOrders.SingleAsync()).Id);
 
@@ -130,8 +130,8 @@ public sealed class LogisticsMigrationTests
             UPDATE delivery_order_boxes SET cancelled_at=now() WHERE order_id=1;
             INSERT INTO delivery_order_boxes(order_id,physical_box_id,point_id,status) VALUES(2,1,1,1);
             """);
-        Assert.Equal(2, await db.DeliveryOrderUnits.CountAsync());
-        Assert.Equal(1, await db.NeedToDeliverItems.CountAsync());
+        Assert.Equal(2L, await Scalar(database.ConnectionString, "SELECT count(*) FROM delivery_order_units"));
+        Assert.Equal(1L, await Scalar(database.ConnectionString, "SELECT count(*) FROM need_to_deliver"));
 
         // The operation writes location, scan timestamp and movement together.
         await using (var transaction = await db.Database.BeginTransactionAsync())
@@ -180,9 +180,9 @@ public sealed class LogisticsMigrationTests
         await using var db = CreateContext(database.ConnectionString);
         await db.GetService<IMigrator>().MigrateAsync(Previous);
         await db.Database.ExecuteSqlRawAsync(LegacySeed);
-        await db.Database.MigrateAsync();
+        await db.GetService<IMigrator>().MigrateAsync(Responsible);
         await db.GetService<IMigrator>().MigrateAsync(Previous);
-        await db.Database.MigrateAsync();
+        await db.GetService<IMigrator>().MigrateAsync(Responsible);
         Assert.Equal(1, await db.PhysicalBoxes.CountAsync());
     }
 

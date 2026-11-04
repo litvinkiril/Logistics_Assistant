@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 
+using System.ComponentModel.DataAnnotations;
+
 namespace Logistics_Assistant.Models
 {
     [Table("boxes")]
@@ -11,8 +13,12 @@ namespace Logistics_Assistant.Models
         [Column("product_id")]
         public long ProductId { get; set; }
 
-        [Column("box_number")]
-        public int BoxNumber { get; set; }
+        [Column("name")]
+        [MaxLength(256)]
+        public string Name { get; set; } = string.Empty;
+
+        [Column("quantity_per_product")]
+        public int QuantityPerProduct { get; set; } = 1;
 
         [Column("width_cm", TypeName = "numeric(8,2)")]
         public decimal WidthCm { get; set; }

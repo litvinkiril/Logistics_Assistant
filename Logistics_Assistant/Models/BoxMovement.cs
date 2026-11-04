@@ -2,6 +2,12 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Logistics_Assistant.Models;
 
+public enum BoxMovementOperation
+{
+    Load = 1,
+    Unload = 2
+}
+
 [Table("box_movements")]
 public class BoxMovement
 {
@@ -11,14 +17,15 @@ public class BoxMovement
     [Column("physical_box_id")]
     public long PhysicalBoxId { get; set; }
 
-    [Column("order_id")]
-    public long OrderId { get; set; }
+    [Column("order_item_id")]
+    public long OrderItemId { get; set; }
 
-    [Column("from_point_id")]
-    public long? FromPointId { get; set; }
+    [Column("operation")]
+    public BoxMovementOperation Operation { get; set; }
 
-    [Column("to_point_id")]
-    public long? ToPointId { get; set; }
+    // Source for loading, destination for unloading; the other endpoint is the vehicle.
+    [Column("point_id")]
+    public long PointId { get; set; }
 
     [Column("user_id")]
     public string UserId { get; set; } = string.Empty;
