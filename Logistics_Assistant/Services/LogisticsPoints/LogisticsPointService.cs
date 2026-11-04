@@ -36,8 +36,9 @@ namespace Logistics_Assistant.Services.LogisticsPoints
                 {
                     Product = product,
                     Warehouses = _db.WarehouseProducts
-                        .Where(stock => stock.ProductId == product.Id)
-                        .OrderBy(stock => stock.LogisticsPointId)
+                        .Where(stock => stock.ProductId == product.Id && stock.Quantity > 0)
+                        .OrderByDescending(stock => stock.Quantity)
+                        .ThenBy(stock => stock.LogisticsPointId)
                         .ThenBy(stock => stock.Id)
                         .Select(stock => new WarehouseStockDto
                         {

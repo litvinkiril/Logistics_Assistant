@@ -3,6 +3,7 @@ using Logistics_Assistant.Services.DeliveryOrders;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Logistics_Assistant.DTOs.DeliveryOrders;
 
 namespace Logistics_Assistant.Controllers;
 
@@ -69,4 +70,23 @@ public class DeliveryOrdersController : ControllerBase
                 "Неизвестный результат назначения.")
         };
     }
+
+    [HttpGet("{id:long}")]
+    public async Task<ActionResult<DeliveryOrderDetailsResponse>> GetDetailsAsync(
+    long id,
+    CancellationToken cancellationToken)
+    {
+        if (id <= 0)
+            return BadRequest("ID рейса должен быть положительным числом.");
+
+        var result = await _orders.GetDetailsAsync(
+            id,
+            cancellationToken);
+
+        if (result is null)
+            return NotFound("Рейс не найден.");
+
+        return Ok(result);
+    }
+
 }

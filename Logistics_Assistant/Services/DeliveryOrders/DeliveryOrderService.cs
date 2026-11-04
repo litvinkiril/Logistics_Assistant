@@ -3,6 +3,7 @@ using Logistics_Assistant.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Caching.Hybrid;
+using Logistics_Assistant.DTOs.DeliveryOrders;
 
 namespace Logistics_Assistant.Services.DeliveryOrders;
 
@@ -76,5 +77,54 @@ public class DeliveryOrderService
         return orderExists
             ? AssignResponsibleResult.AlreadyAssigned
             : AssignResponsibleResult.OrderNotFound;
+    }
+
+    public async Task<DeliveryOrderDetailsResponse?> GetDetailsAsync(
+    long orderId,
+    CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(orderId);
+
+        var order = await _db.DeliveryOrders
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                order => order.Id == orderId,
+                cancellationToken);
+
+        if (order is null)
+            return null;
+
+        var items = await (
+            from item in _db.DeliveryOrderItems.AsNoTracking()
+            join box in _db.Boxes
+                on item.BoxId equals box.Id
+            join product in _db.Products
+                on box.ProductId equals product.Id
+            join destination in _db.LogisticsPoints
+                on item.DestinationPointId equals destination.Id
+            where item.OrderId == orderId
+            orderby destination.Id, product.Name, box.Id, item.Id
+            select new DeliveryCargoDto
+            {
+                ItemId = item.Id,
+                ProductId = product.Id,
+                ProductName = product.Name,
+                BoxId = box.Id,
+                BoxName = box.Name,
+                BoxQuantity = item.Quantity,
+
+                InTruckBoxQuantity = _db.PhysicalBoxes.Count(physicalBox =>
+                    physicalBox.CurrentOrderItemId == item.Id &&
+                    physicalBox.Status == PhysicalBoxStatus.InTransit),
+
+                Destination = destination
+            })
+            .ToListAsync(cancellationToken);
+
+        return new DeliveryOrderDetailsResponse
+        {
+            Order = order,
+            Items = items
+        };
     }
 }
